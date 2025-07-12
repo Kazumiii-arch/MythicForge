@@ -1,0 +1,45 @@
+# The unique internal ID for this set.
+set_id: 'frozen_king'
+
+# The display name for the set.
+set_display_name: "&b&lFrozen King's Battlegear"
+
+# These are the enchantments from the "Frost Lancer" pack we designed.
+# A player must have items with these enchantments equipped to get the bonuses.
+required_enchantments:
+  - 'glacial_fortitude' # Can be on Helmet or Leggings
+  - 'ice_cloak'         # On Chestplate
+  - 'frozen_step'       # On Boots
+  - 'frost_weapon'      # On Sword or Axe
+
+# The bonuses granted based on how many pieces of the set are equipped.
+bonuses:
+  # 2-Piece Bonus: Unhindered movement.
+  - pieces_required: 2
+    passive_effects:
+      # Complements the slow immunity from 'frozen_step'. The wearer is a master of movement.
+      - 'POTION:SPEED:0' # Grants Speed I
+
+  # 3-Piece Bonus: Icy resilience.
+  - pieces_required: 3
+    passive_effects:
+      - 'POTION:SPEED:0'           # Speed I
+      - 'POTION:REGENERATION:0'    # Regeneration I
+
+  # 4-Piece Bonus (Full Set): The embodiment of winter's wrath.
+  - pieces_required: 4
+    passive_effects:
+      - 'POTION:SPEED:0'           # Speed I
+      - 'POTION:REGENERATION:1'    # Upgrades to Regeneration II
+      # New Effect: A constant, frosty visual aura.
+      - 'AMBIENT_PARTICLE:SNOWFLAKE'
+    triggered_effects:
+      # A powerful crowd-control ability that triggers on hit.
+      - trigger: 'ATTACK'
+        conditions:
+          - 'chance:15' # A 15% chance on every hit.
+        effects:
+          # New Effect: Unleashes a flash freeze around the target.
+          # AOE_EFFECT target:<friends/enemies> radius:<blocks> effect:'<effect_string>'
+          - 'AOE_EFFECT target:enemies radius:3 effect:''POTION:SLOW:2:80''' # Slow III for 4s
+          - 'SOUND:BLOCK_GLASS_BREAK pitch:0.8'
