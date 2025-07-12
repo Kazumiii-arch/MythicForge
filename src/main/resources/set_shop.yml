@@ -1,1 +1,111 @@
+# -------------------------------------------------- #
+#        🔮 MythicForge - Pre-Made Set Gear Shop       #
+# -------------------------------------------------- #
+# This file controls everything for the static, categorized Set Gear Shop NPC.
 
+# The title of the main GUI where players select a category.
+main_gui_title: "&1Legendary Armorsmith"
+
+# The title format for when a player is viewing a specific category.
+# Placeholder: {category_name}
+category_gui_title: "&1Armorsmith - {category_name}"
+
+# ---------------------------------
+#  SHOP CATEGORIES
+# ---------------------------------
+# Define the categories that will appear in the main shop GUI.
+# Each category opens a new GUI showing the sets assigned to it.
+categories:
+  warrior_sets:
+    # The item representing this category in the main menu.
+    display_item: "NETHERITE_SWORD"
+    display_name: "&cWarrior Sets"
+    lore:
+      - "&7Armor and weapons focused"
+      - "&7on overwhelming combat power."
+      - ""
+      - "&eClick to browse!"
+    # The slot this category will appear in in the main menu.
+    slot: 11
+
+  mage_sets:
+    display_item: "ENCHANTING_TABLE"
+    display_name: "&9Arcane Battlegear"
+    lore:
+      - "&7Gear that enhances your control"
+      - "&7over the battlefield."
+      - ""
+      - "&eClick to browse!"
+    slot: 13
+
+  legendary_weapons:
+    display_item: "NETHERITE_AXE"
+    display_name: "&6Legendary Weapons"
+    lore:
+      - "&7Unique weapons of immense power."
+      - ""
+      - "&eClick to browse!"
+    slot: 15
+
+# ---------------------------------
+#  GEAR SET DEFINITIONS
+# ---------------------------------
+# Define the actual sets of gear for sale.
+# Each set must be assigned to one of the categories above.
+gear_sets:
+  wither_king:
+    category: "warrior_sets"
+    full_set_price: 120000.0 # Price to buy all 4 armor pieces at once. (Set to 0 to disable)
+    pieces:
+      helmet:
+        material: "NETHERITE_HELMET"
+        enchantment_id: "wither_helm"
+        price: 35000.0
+      chestplate:
+        material: "NETHERITE_CHESTPLATE"
+        enchantment_id: "wither_chest"
+        price: 50000.0
+      leggings:
+        material: "NETHERITE_LEGGINGS"
+        enchantment_id: "wither_legs"
+        price: 40000.0
+      boots:
+        material: "NETHERITE_BOOTS"
+        enchantment_id: "wither_boots"
+        price: 30000.0
+      # The weapon is sold separately under the 'legendary_weapons' category
+      
+  frozen_king:
+    category: "mage_sets"
+    full_set_price: 110000.0
+    pieces:
+      helmet:
+        material: "DIAMOND_HELMET"
+        enchantment_id: "glacial_fortitude"
+        price: 30000.0
+      chestplate:
+        material: "DIAMOND_CHESTPLATE"
+        enchantment_id: "ice_cloak"
+        price: 45000.0
+      leggings:
+        material: "DIAMOND_LEGGINGS"
+        enchantment_id: "glacial_fortitude" # Example of an enchant being on two piece types
+        price: 30000.0
+      boots:
+        material: "DIAMOND_BOOTS"
+        enchantment_id: "frozen_step"
+        price: 25000.0
+        
+  # This demonstrates selling a single, powerful weapon instead of a full set.
+  legendary_weapon_list:
+    category: "legendary_weapons"
+    # No full_set_price as these are individual items.
+    pieces:
+      wither_sword:
+        material: "NETHERITE_SWORD"
+        enchantment_id: "wither_sword" # Assumes a 'wither_sword' enchant exists
+        price: 80000.0
+      frost_weapon:
+        material: "DIAMOND_SWORD"
+        enchantment_id: "frost_weapon"
+        price: 70000.0
