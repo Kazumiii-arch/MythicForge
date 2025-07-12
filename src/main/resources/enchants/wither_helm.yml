@@ -1,1 +1,54 @@
+# The unique internal ID of the enchantment.
+id: 'wither_helm'
 
+# This is a top-tier item, so its tier should be high.
+tier: 'legendary'
+
+# Unique set pieces like this often have only one level.
+max_level: 1
+
+# The name displayed in the item's lore.
+display_name: "&8&lWither King's Crown"
+
+# The new description explains its powerful, unique abilities.
+description:
+  - '&7Grants the wearer immunity to the'
+  - '&7withering effect. When near death,'
+  - '&7unleashes a defensive blast of shadows.'
+
+# This can only be applied to helmets.
+applicable_to:
+  - 'HELMET'
+
+# --- Effects ---
+# This enchantment now has two distinct effect groups for different situations.
+effects:
+  # Effect Group 1: The passive, always-on Wither Immunity.
+  - trigger: 'PASSIVE'
+    # This effect is constantly applied by the ActiveEffectTask.
+    effects:
+      # This new effect type would be added to the EffectProcessor.
+      # It grants the player total immunity to a specific potion effect.
+      - 'EFFECT_IMMUNITY:WITHER'
+
+  # Effect Group 2: The life-saving "Wither Shield" clutch mechanic.
+  - trigger: 'DEFEND' # This triggers whenever the player takes damage.
+    conditions:
+      # This is a new, advanced condition type.
+      # It checks if the player's health is below a certain percentage.
+      - 'health_below_percent 40' # Triggers at 40% health or less (8 hearts)
+      
+      # This is another advanced condition to prevent the effect from
+      # happening too often. This is crucial for balance.
+      - 'cooldown 90' # Can only activate once every 90 seconds.
+    effects:
+      # Grants a powerful but temporary shield of Absorption hearts.
+      # POTION:<TYPE>:<AMPLIFIER>:<DURATION_TICKS>
+      - 'POTION:ABSORPTION:4:200' # Absorption V (10 hearts) for 10 seconds.
+      
+      # A dramatic particle effect to create a visual shield.
+      # This would create a dark, swirling sphere of particles around the player.
+      - 'PARTICLE:SQUID_INK count:100 radius:1.5 speed:0.05'
+      
+      # The iconic sound of the Wither boss, making the ability feel epic.
+      - 'SOUND:ENTITY_WITHER_SPAWN pitch:1.2 volume:1.0'
