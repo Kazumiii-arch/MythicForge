@@ -1,1 +1,87 @@
+# The public name of the plugin.
+name: MythicForge
+# The version of the plugin. Follows semantic versioning (Major.Minor.Patch).
+version: 1.0.0
+# The full path to the main class that extends JavaPlugin.
+main: com.vortex.mythicforge.MythicForge
+# The minimum Minecraft version API this plugin is built against.
+# 1.18 is a good modern baseline for access to NBT APIs.
+api-version: 1.18
+# The author's name or company name.
+author: Vortex
+# A brief description of what the plugin does.
+description: The ultimate custom enchantment, rune, and set bonus engine.
 
+# --- Dependencies ---
+# These plugins are REQUIRED for MythicForge to start. The server will not enable it without them.
+depend:
+  - Vault
+
+# These plugins are OPTIONAL. MythicForge will load without them,
+# but features related to them will be disabled.
+softdepend:
+  - Citizens
+  - PlaceholderAPI
+  - MythicMobs
+  - MMOItems
+  - Oraxen
+  - DeluxeMenus
+  - Quests
+
+# --- Load Order ---
+# This tells the server to try and load MythicForge BEFORE these plugins.
+# This is useful if other plugins need to access MythicForge's API on startup.
+loadbefore:
+  - DeluxeMenus
+  - Quests
+
+# --- Commands ---
+# Registration for all player and admin commands.
+commands:
+  mythicforge:
+    description: The main command for the MythicForge plugin.
+    aliases: [mf, mforge]
+    usage: |
+      /mf give <player> <enchant> [level]
+      /mf salvage
+      /mf reload
+      /mf help
+
+# --- Permissions ---
+# Granular permissions for every feature, allowing for precise control.
+permissions:
+  mythicforge.*:
+    description: Grants access to all MythicForge features and commands.
+    default: op
+    children:
+      mythicforge.admin: true
+      mythicforge.player: true
+
+  mythicforge.admin:
+    description: Grants access to all administrative commands and features.
+    default: op
+    children:
+      mythicforge.admin.give: true
+      mythicforge.admin.reload: true
+      mythicforge.admin.npc: true
+      # Add other admin perms like /mf edit here later
+
+  mythicforge.player:
+    description: Grants access to all player commands.
+    default: true
+    children:
+      mythicforge.command.salvage: true
+      # Add other player commands like /mf help here
+
+  mythicforge.admin.give:
+    description: Allows usage of the /mf give command.
+    default: op
+  mythicforge.admin.reload:
+    description: Allows usage of the /mf reload command.
+    default: op
+  mythicforge.admin.npc:
+    description: Allows setting NPC roles for MythicForge.
+    default: op
+  mythicforge.command.salvage:
+    description: Allows players to use the /mf salvage command.
+    default: true
