@@ -12,7 +12,7 @@ repositories {
     // Spigot API
     maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
 
-    // JitPack for Citizens, Vault, etc.
+    // JitPack for FancyNPCs, Vault, etc.
     maven { url = uri("https://jitpack.io/") }
 
     // PlaceholderAPI repo
@@ -24,8 +24,8 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // ✅ Use Citizens via GitHub commit (from JitPack)
-    implementation("com.github.CitizensDev:Citizens2:b3f3c74")
+    // ✅ Use FancyNPCs plugin from JitPack (latest release)
+    implementation("com.github.FancyMC:FancyNPCs:2.6.0.280")
 }
 
 java {
@@ -38,8 +38,8 @@ tasks {
         archiveClassifier.set("")
         archiveVersion.set(project.version.toString())
 
-        // ✅ Relocate Citizens to avoid runtime conflicts with the server's version
-        relocate("net.citizensnpcs", "com.vortex.libs.citizens")
+        // ✅ Relocate FancyNPCs package to avoid conflicts
+        relocate("de.oliver.fancynpcs", "com.vortex.libs.fancynpcs")
     }
 
     build {
