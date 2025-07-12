@@ -12,11 +12,11 @@ repositories {
     // Spigot API
     maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
 
-    // JitPack for FancyNPCs, Vault, etc.
-    maven { url = uri("https://jitpack.io/") }
-
     // PlaceholderAPI repo
     maven { url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/") }
+
+    // JitPack (for Vault or others)
+    maven { url = uri("https://jitpack.io/") }
 }
 
 dependencies {
@@ -24,8 +24,8 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // ✅ Use FancyNPCs plugin from JitPack (latest release)
-    implementation("com.github.FancyMC:FancyNPCs:2.6.0.280")
+    // ✅ Use FancyNPCs from local JAR
+    implementation(files("libs/FancyNPCs.jar"))
 }
 
 java {
@@ -38,7 +38,7 @@ tasks {
         archiveClassifier.set("")
         archiveVersion.set(project.version.toString())
 
-        // ✅ Relocate FancyNPCs package to avoid conflicts
+        // ✅ Relocate FancyNPCs to avoid conflicts
         relocate("de.oliver.fancynpcs", "com.vortex.libs.fancynpcs")
     }
 
