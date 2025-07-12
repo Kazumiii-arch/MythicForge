@@ -1,1 +1,54 @@
+# The unique internal ID for this set.
+set_id: 'wither_king'
 
+# The display name for the set, for use in GUIs or messages.
+set_display_name: "&8&lWither King's Regalia"
+
+# The list of custom enchantment IDs that are part of this set.
+# Including the weapon allows for a 5-piece bonus.
+required_enchantments:
+  - 'wither_helm'
+  - 'wither_chest'
+  - 'wither_legs'
+  - 'wither_boots'
+  - 'wither_sword'
+
+# The bonuses granted based on how many pieces of the set are equipped.
+# The system grants the highest-achieved bonus tier.
+bonuses:
+  # 2-Piece Bonus: The first taste of power.
+  - pieces_required: 2
+    passive_effects:
+      - 'POTION:INCREASE_DAMAGE:0' # Grants Strength I
+
+  # 3-Piece Bonus: Becoming more resilient.
+  - pieces_required: 3
+    passive_effects:
+      - 'POTION:INCREASE_DAMAGE:0'      # Strength I
+      - 'POTION:DAMAGE_RESISTANCE:0' # Resistance I
+
+  # 4-Piece Bonus (Full Armor): A major power spike with a new visual aura.
+  - pieces_required: 4
+    passive_effects:
+      - 'POTION:INCREASE_DAMAGE:1'      # Upgrades to Strength II
+      - 'POTION:DAMAGE_RESISTANCE:0' # Resistance I
+      # New Effect: A constant, intimidating particle effect for the wearer.
+      - 'AMBIENT_PARTICLE:ASH'
+
+  # 5-Piece Bonus (Full Armor + Weapon): The ultimate form.
+  - pieces_required: 5
+    passive_effects:
+      - 'POTION:INCREASE_DAMAGE:1'      # Strength II
+      - 'POTION:DAMAGE_RESISTANCE:1' # Upgrades to Resistance II
+      # The particle aura remains, signifying mastery.
+      - 'AMBIENT_PARTICLE:ASH'
+    triggered_effects:
+      # An ultimate ability that triggers on hit.
+      - trigger: 'ATTACK'
+        conditions:
+          - 'chance 20' # A 20% chance on every hit.
+        effects:
+          # New Effect: Unleashes a pulse of withering energy around the target.
+          # Format: AOE_EFFECT target:<friends/enemies> radius:<blocks> effect:'<effect_string>'
+          - 'AOE_EFFECT target:enemies radius:4 effect:''POTION:WITHER:1:100'''
+          - 'SOUND:ENTITY_WITHER_HURT pitch:0.8'
