@@ -1,1 +1,58 @@
+# The unique internal ID of the enchantment.
+id: 'frost_weapon'
 
+# Tier determines rarity and is used by other systems (scrolls, salvage, etc.).
+tier: 'rare'
+
+# The maximum level this enchantment can reach.
+max_level: 3
+
+# The name displayed in the item's lore.
+display_name: "&bFrost Weapon {level_roman}"
+
+# The description has been updated to reflect the new effects.
+description:
+  - '&7Has a chance to inflict a chilling'
+  - '&7slow on your enemies. Higher levels'
+  - '&7have a small chance to temporarily'
+  - '&7freeze them solid.'
+
+# What type of items this enchantment can be applied to.
+applicable_to:
+  - 'SWORD'
+  - 'AXE'
+
+# --- Effects ---
+# This enchantment now has two separate effect groups for the same trigger.
+# The engine will check both on every attack.
+effects:
+  # Effect Group 1: The primary, reliable "Chill" effect.
+  - trigger: 'ATTACK'
+    conditions:
+      # Increased the base chance and scaling to make it more noticeable.
+      - 'chance 25 + ({level_number} * 10)' # Level 1=35%, Level 2=45%, Level 3=55%
+    effects:
+      # The slow effect now scales more effectively in both duration and power.
+      # Format: TARGET_POTION:<TYPE>:<AMPLIFIER>:<DURATION_TICKS>
+      - 'TARGET_POTION:SLOW:{level_number}-1:{level_number}*40+20' # Slow I for 3s -> Slow III for 7s
+      
+      # Added a satisfying sound effect on proc.
+      - 'SOUND:BLOCK_GLASS_HIT pitch:1.5'
+      
+      # Made the particle effect more pronounced.
+      - 'PARTICLE:SNOWFLAKE count:15 speed:0.1'
+
+  # Effect Group 2: The rare, high-impact "Freeze" effect.
+  - trigger: 'ATTACK'
+    conditions:
+      # This has a much lower chance, making it an exciting, rare event.
+      - 'chance {level_number} * 2.5' # Level 1=2.5%, Level 2=5%, Level 3=7.5%
+    effects:
+      # Applies a very high level of Slowness, effectively rooting the target.
+      - 'TARGET_POTION:SLOW:7:20' # "Freeze" for 1 second (20 ticks).
+      
+      # A more dramatic particle effect for the freeze.
+      - 'PARTICLE:BLOCK_CRACK material:ICE count:30'
+      
+      # A more thematic and dramatic sound effect.
+      - 'SOUND:ENTITY_PLAYER_HURT_FREEZE pitch:1.0'
