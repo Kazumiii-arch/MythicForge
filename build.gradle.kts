@@ -1,6 +1,5 @@
 // ========================================================================
 // File: build.gradle.kts
-// Location: /build.gradle.kts
 // Project: MythicForge
 // ========================================================================
 plugins {
@@ -12,42 +11,44 @@ plugins {
 group = "com.vortex"
 version = "1.0.0"
 
-// Define all the repositories needed to download our plugin's dependencies
+// Define all repositories needed to download dependencies
 repositories {
     mavenCentral()
-    maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") } // For Spigot API
-    maven { url = uri("https://jitpack.io/") } // For Vault and Citizens
-    maven { url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/") } // For PlaceholderAPI
+    maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") } // Spigot API
+    maven { url = uri("https://jitpack.io/") } // Vault, Citizens
+    maven { url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/") } // PlaceholderAPI
 }
 
-// Define all the external plugins MythicForge needs to hook into
+// External plugin dependencies
 dependencies {
-    // These are marked 'compileOnly' because the server will provide them at runtime
     compileOnly("org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT")
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
-    
-    // The full Citizens API artifact
-    compileOnly("com.github.CitizensDev.Citizens2:citizens-main:2.0.33-SNAPSHOT")
+
+    // ✅ Shading Citizens into the final plugin JAR with relocation
+    implementation("com.github.CitizensDev:Citizens2:2.0.33-SNAPSHOT")
 }
 
-// Set the project to use Java 17, as required for modern Minecraft versions
+// Java 17 language level (required for modern Minecraft versions)
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(17))
 }
 
-// Configure the output JAR file
+// ShadowJar configuration
 tasks {
     shadowJar {
-        archiveBaseName.set("MythicForge") // Set the final JAR name
-        archiveClassifier.set("") // Remove the '-all' suffix
+        archiveBaseName.set("MythicForge")
+        archiveClassifier.set("") // No '-all' suffix
         archiveVersion.set(project.version.toString())
+
+        // ✅ Relocate Citizens to avoid classpath conflicts
+        relocate("net.citizensnpcs", "com.vortex.libs.citizens")
     }
 
     build {
         dependsOn(shadowJar)
     }
-    
+
     withType<JavaCompile> {
         options.encoding = "UTF-8"
     }
