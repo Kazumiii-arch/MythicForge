@@ -1,19 +1,23 @@
 # -------------------------------------------------- #
 #          🔮 MythicForge by Vortex          #
 # -------------------------------------------------- #
-# This is the main configuration file for MythicForge.
-# Here you can control every aspect of the plugin, from
-# enchanting mechanics to shop contents.
+# Welcome to the main configuration file for MythicForge.
+# This file is the central control panel for every feature.
+# It is heavily documented to make customization as easy as possible.
+
+# This version number helps the plugin handle configuration updates in the future. Do not change.
+config-version: '1.0'
 
 # General plugin settings
 plugin_settings:
   # Set to true to enable detailed debug messages in the console.
-  # Useful for diagnosing issues with custom enchantments or mechanics.
+  # This is useful for server admins when creating new enchantments or diagnosing issues.
   debug: false
 
 # This section controls all player-facing enchanting mechanics.
 mechanics:
   # Tier-based settings for success/destroy rates of Enchantment Scrolls.
+  # This allows you to make higher-tier enchantments riskier to apply.
   tiers:
     common:
       success_rate: 85.0
@@ -33,7 +37,9 @@ mechanics:
 
   # Settings for the appearance of Enchantment Scrolls.
   scrolls:
-    # Placeholders: {enchant_name}, {enchant_level_roman}, {enchant_level_number}, {success_rate}, {destroy_rate}
+    # The absolute maximum bonus percentage that can be added to a scroll using dust.
+    max_success_boost: 50.0
+    # Placeholders: {enchant_name}, {enchant_level_roman}, {success_rate}, {destroy_rate}
     display_name: "&bEnchantment Scroll &7({enchant_name}&7)"
     lore:
       - "&7Drag and drop this onto a compatible"
@@ -58,12 +64,9 @@ mechanics:
 
   # Settings for the Socket & Rune system.
   socket_system:
-    # The maximum number of sockets an item can have.
     max_sockets_per_item: 4
-    # The format for how sockets appear in an item's lore.
     socket_lore:
       empty: "&7[ &8Empty Socket &7]"
-      # Placeholder: {rune_name} will be replaced by the inserted rune's name.
       filled: "&7[ {rune_name} &7]"
 
 # This section controls all NPC-driven shops.
@@ -73,20 +76,23 @@ shops:
     refresh_interval_minutes: 1440 # 24 hours
     gui_rows: 3
     currency: "VAULT" # Options: VAULT, PLAYER_POINTS
-    # Defines the pool of items that can appear in the shop.
-    # Format: <TYPE>:<ID>:<LEVEL/AMOUNT>:<PRICE>:<CHANCE_WEIGHT>
+    # Defines the pool of items that can appear in the shop on refresh.
+    # Format Guide:
+    # - "TIER:<tier_id>:<level>:<price>:<chance_weight>" for a random enchant scroll.
+    # - "ITEM:<item_id>:<amount>:<price>:<chance_weight>" for a specific custom item.
     stock_pool:
       - "TIER:common:1:500:100"
-      - "TIER:common:2:1200:80"
       - "TIER:uncommon:1:2500:60"
       - "TIER:rare:1:8000:30"
       - "TIER:legendary:1:30000:10"
       - "ITEM:mythic_dust:16:1200:40"
       - "ITEM:success_dust:3:1000:35"
       - "ITEM:protection_orb:1:25000:5"
+      - "ITEM:socket_creator_item:1:50000:2"
 
-# Central definition for all custom items used by the plugin's mechanics.
+# Central definition for all special items used by the plugin's mechanics.
 custom_items:
+  # --- Enchanting Resources ---
   mythic_dust:
     material: "SUGAR"
     display_name: "&eMythic Dust"
@@ -99,13 +105,14 @@ custom_items:
     lore:
       - "&7Apply this to a scroll to"
       - "&7increase its success chance."
-    boost_amount: 5.0 # The percentage this dust boosts success rate by.
+    boost_amount: 5.0
   protection_orb:
     material: "ENDER_PEARL"
     display_name: "&dProtection Orb"
     lore:
       - "&7Apply this to a scroll to protect"
       - "&7the item from being destroyed."
+  # --- Socketing Items ---
   socket_creator_item:
     material: "NETHERITE_SCRAP"
     display_name: "&6Mythic Socket Chisel"
@@ -113,10 +120,27 @@ custom_items:
       - "&7Drag this onto a piece of gear"
       - "&7to carve a new rune socket."
       - "&cThis process is permanent!"
+  # --- Base Scroll Item ---
+  enchant_scroll:
+    material: "BOOK"
+    display_name: "&bEnchantment Scroll"
+    lore: []
+
+# Settings for all paginated GUIs.
+gui_settings:
+  pagination_items:
+    next_page:
+      material: "ARROW"
+      display_name: "&aNext Page ->"
+    previous_page:
+      material: "ARROW"
+      display_name: "&c<- Previous Page"
+    back_button:
+      material: "BARRIER"
+      display_name: "&c&lBack"
 
 # All player-facing messages can be configured here.
 messages:
   prefix: "&8[&eMythicForge&8] "
-  reload_success: "&aConfiguration and enchantments reloaded successfully."
+  reload_success: "&aConfiguration and all data files reloaded successfully."
   no_permission: "&cYou do not have permission to use this command."
-  # Add other messages for purchase success, failure, etc. here.
