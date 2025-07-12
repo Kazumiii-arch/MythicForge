@@ -1,1 +1,103 @@
+# -------------------------------------------------- #
+#           🔮 MythicForge - Rune Definitions          #
+# -------------------------------------------------- #
+# This file contains the definitions for all runes that can be socketed into gear.
+# Each rune must have a unique ID (the key, e.g., 'rune_of_haste').
 
+runes:
+  # --- Tier 1: Advanced Runes ---
+  rune_of_haste:
+    display_name: "&eHaste Rune"
+    tier: 'advanced'
+    item:
+      material: "SUGAR"
+      lore:
+        - "&7A simple rune that thrums with"
+        - "&7boundless energy."
+        - ""
+        - "&9Socket Effect:"
+        - "&f ▪ Grants a permanent speed boost."
+    # Effects are applied when the item is equipped via the ActiveEffectTask.
+    # Format: <EFFECT_TYPE>:<...args>
+    effects:
+      - 'POTION:SPEED:0' # Grants Speed I
+
+  rune_of_the_bulwark:
+    display_name: "&aBulwark Rune"
+    tier: 'advanced'
+    item:
+      material: "BRICK"
+      lore:
+        - "&7A sturdy rune carved from hardened clay."
+        - ""
+        - "&9Socket Effect:"
+        - "&f ▪ Grants permanent resistance to damage."
+    effects:
+      - 'POTION:DAMAGE_RESISTANCE:0' # Grants Resistance I
+
+  # --- Tier 2: Rare Runes ---
+  rune_of_vitality:
+    display_name: "&cVitality Rune"
+    tier: 'rare'
+    item:
+      material: "REDSTONE"
+      lore:
+        - "&7A warm rune that pulses with life."
+        - ""
+        - "&9Socket Effect:"
+        - "&f ▪ Increases your maximum health."
+    effects:
+      # Format: ATTRIBUTE:<AttributeName>:<OPERATION>:<AMOUNT>
+      # This adds 2 health points (1 full heart).
+      - 'ATTRIBUTE:GENERIC_MAX_HEALTH:ADD:2.0'
+      
+  rune_of_the_marksman:
+    display_name: "&6Marksman's Rune"
+    tier: 'rare'
+    item:
+      material: "SPECTRAL_ARROW"
+      lore:
+        - "&7A perfectly balanced rune that"
+        - "&7seems to guide your hand."
+        - ""
+        - "&9Socket Effect:"
+        - "&f ▪ Socketed into a weapon, grants a"
+        - "&f   chance to deal bonus arrow damage."
+    # This rune uses a triggered effect instead of a passive one.
+    # It will only work if socketed into an item that can trigger 'ATTACK'.
+    effects:
+      - trigger: 'ATTACK' # This effect is handled by the GlobalListener
+        conditions:
+          - 'is_projectile true' # New condition: only works for projectiles (bows, crossbows)
+          - 'chance 25'
+        effects:
+          # New effect: adds a flat amount of bonus damage.
+          - 'DEAL_DAMAGE:4.0' # Deals 4 extra damage (2 hearts)
+          - 'SOUND:ENTITY_ARROW_HIT_PLAYER'
+
+  # --- Tier 3: Mythic Runes ---
+  rune_of_solar_fury:
+    display_name: "&6&lSolar Fury Rune"
+    tier: 'mythic'
+    item:
+      material: "GLOWSTONE"
+      lore:
+        - "&7A shard of pure sunlight, almost"
+        - "&7too hot to hold."
+        - ""
+        - "&9Socket Effect:"
+        - "&f ▪ Grants permanent Fire Resistance."
+        - "&f ▪ Ignites attackers who strike you."
+    # This rune has both a passive and a triggered effect.
+    effects:
+      - trigger: 'PASSIVE'
+        effects:
+          - 'POTION:FIRE_RESISTANCE:0'
+      - trigger: 'DEFEND' # Triggers when the wearer is hit
+        conditions:
+          - 'chance 30'
+        effects:
+          # Sets the attacker on fire for 5 seconds.
+          - 'ATTACKER_FIRE:100'
+    # This is our first item with the glow effect enabled.
+    glow: true
