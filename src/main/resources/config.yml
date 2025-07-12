@@ -1,1 +1,122 @@
+# -------------------------------------------------- #
+#          🔮 MythicForge by Vortex          #
+# -------------------------------------------------- #
+# This is the main configuration file for MythicForge.
+# Here you can control every aspect of the plugin, from
+# enchanting mechanics to shop contents.
 
+# General plugin settings
+plugin_settings:
+  # Set to true to enable detailed debug messages in the console.
+  # Useful for diagnosing issues with custom enchantments or mechanics.
+  debug: false
+
+# This section controls all player-facing enchanting mechanics.
+mechanics:
+  # Tier-based settings for success/destroy rates of Enchantment Scrolls.
+  tiers:
+    common:
+      success_rate: 85.0
+      destroy_rate: 10.0
+    uncommon:
+      success_rate: 70.0
+      destroy_rate: 20.0
+    rare:
+      success_rate: 55.0
+      destroy_rate: 30.0
+    legendary:
+      success_rate: 40.0
+      destroy_rate: 45.0
+    mythic:
+      success_rate: 25.0
+      destroy_rate: 60.0
+
+  # Settings for the appearance of Enchantment Scrolls.
+  scrolls:
+    # Placeholders: {enchant_name}, {enchant_level_roman}, {enchant_level_number}, {success_rate}, {destroy_rate}
+    display_name: "&bEnchantment Scroll &7({enchant_name}&7)"
+    lore:
+      - "&7Drag and drop this onto a compatible"
+      - "&7item to apply the enchantment."
+      - ""
+      - "&eEnchantment: {enchant_name} {enchant_level_roman}"
+      - "&eSuccess Rate: &a{success_rate}%"
+      - "&eDestroy Rate: &c{destroy_rate}%"
+      - ""
+      - "&8A powerful scroll from the MythicForge."
+
+  # Settings for the item salvaging system.
+  salvage_system:
+    gui_title: "&8Salvage Station"
+    # Define how much dust is returned per enchantment level, based on the enchant's tier.
+    dust_yield:
+      common: 1
+      uncommon: 2
+      rare: 4
+      legendary: 7
+      mythic: 12
+
+  # Settings for the Socket & Rune system.
+  socket_system:
+    # The maximum number of sockets an item can have.
+    max_sockets_per_item: 4
+    # The format for how sockets appear in an item's lore.
+    socket_lore:
+      empty: "&7[ &8Empty Socket &7]"
+      # Placeholder: {rune_name} will be replaced by the inserted rune's name.
+      filled: "&7[ {rune_name} &7]"
+
+# This section controls all NPC-driven shops.
+shops:
+  enchant_shop:
+    gui_title: "&5Mysterious Wares"
+    refresh_interval_minutes: 1440 # 24 hours
+    gui_rows: 3
+    currency: "VAULT" # Options: VAULT, PLAYER_POINTS
+    # Defines the pool of items that can appear in the shop.
+    # Format: <TYPE>:<ID>:<LEVEL/AMOUNT>:<PRICE>:<CHANCE_WEIGHT>
+    stock_pool:
+      - "TIER:common:1:500:100"
+      - "TIER:common:2:1200:80"
+      - "TIER:uncommon:1:2500:60"
+      - "TIER:rare:1:8000:30"
+      - "TIER:legendary:1:30000:10"
+      - "ITEM:mythic_dust:16:1200:40"
+      - "ITEM:success_dust:3:1000:35"
+      - "ITEM:protection_orb:1:25000:5"
+
+# Central definition for all custom items used by the plugin's mechanics.
+custom_items:
+  mythic_dust:
+    material: "SUGAR"
+    display_name: "&eMythic Dust"
+    lore:
+      - "&7A potent powder salvaged from"
+      - "&7magical items."
+  success_dust:
+    material: "GLOWSTONE_DUST"
+    display_name: "&aSuccess-Boosting Dust"
+    lore:
+      - "&7Apply this to a scroll to"
+      - "&7increase its success chance."
+    boost_amount: 5.0 # The percentage this dust boosts success rate by.
+  protection_orb:
+    material: "ENDER_PEARL"
+    display_name: "&dProtection Orb"
+    lore:
+      - "&7Apply this to a scroll to protect"
+      - "&7the item from being destroyed."
+  socket_creator_item:
+    material: "NETHERITE_SCRAP"
+    display_name: "&6Mythic Socket Chisel"
+    lore:
+      - "&7Drag this onto a piece of gear"
+      - "&7to carve a new rune socket."
+      - "&cThis process is permanent!"
+
+# All player-facing messages can be configured here.
+messages:
+  prefix: "&8[&eMythicForge&8] "
+  reload_success: "&aConfiguration and enchantments reloaded successfully."
+  no_permission: "&cYou do not have permission to use this command."
+  # Add other messages for purchase success, failure, etc. here.
