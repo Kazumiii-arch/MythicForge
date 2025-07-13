@@ -2,20 +2,24 @@ package com.vortex.mythicforge.managers;
 
 import com.vortex.mythicforge.MythicForge;
 import com.vortex.mythicforge.enchants.SetBonus;
-import org.bukkit.configuration.ConfigurationSection;
+import com.vortex.mythicforge.enchants.SetBonus.BonusTier;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 /**
  * Manages the loading, storage, and retrieval of all gear set bonuses
- * from the /sets/ directory.
+ * from the /sets/ directory. It also provides utility methods to determine
+ * a player's active set bonus.
  *
  * @author Vortex
- * @version 1.0.0
+ * @version 1.0.1
  */
 public final class SetBonusManager {
 
@@ -36,16 +40,12 @@ public final class SetBonusManager {
         File setsDir = new File(plugin.getDataFolder(), "sets");
         if (!setsDir.exists()) {
             setsDir.mkdirs();
-            // Save example files for the user
             plugin.saveResource("sets/wither_king.yml", false);
             plugin.saveResource("sets/frozen_king.yml", false);
         }
 
         File[] setFiles = setsDir.listFiles((dir, name) -> name.endsWith(".yml"));
-        if (setFiles == null) {
-            plugin.getLogger().warning("Could not read files from the /sets/ directory.");
-            return;
-        }
+        if (setFiles == null) return;
 
         for (File file : setFiles) {
             FileConfiguration config = YamlConfiguration.loadConfiguration(file);
@@ -56,30 +56,27 @@ public final class SetBonusManager {
                     continue;
                 }
 
-                // --- Parse Bonus Tiers ---
                 List<Map<?, ?>> rawBonusTiers = config.getMapList("bonuses");
-                if (rawBonusTiers.isEmpty()) {
-                    plugin.getLogger().warning("Skipping set '" + setId + "': No 'bonuses' section found.");
-                    continue;
-                }
+                if (rawBonusTiers.isEmpty()) continue;
 
-                List<SetBonus.BonusTier> bonusTiers = new ArrayList<>();
+                List<BonusTier> bonusTiers = new ArrayList<>();
                 for (Map<?, ?> rawTier : rawBonusTiers) {
+                    if (!(rawTier.get("pieces_required") instanceof Integer)) continue;
                     int piecesRequired = (int) rawTier.get("pieces_required");
-                    List<String> passiveEffects = (List<String>) rawTier.getOrDefault("passive_effects", Collections.emptyList());
-                    List<Map<?, ?>> triggeredEffects = (List<Map<?, ?>>) rawTier.getOrDefault("triggered_effects", Collections.emptyList());
+                    
+                    // Safe parsing for lists
+                    List<String> passiveEffects = getOrDefaultAsListOf(rawTier, "passive_effects", String.class);
+                    List<Map<?, ?>> triggeredEffects = getOrDefaultAsListOf(rawTier, "triggered_effects", Map.class);
 
-                    bonusTiers.add(new SetBonus.BonusTier(piecesRequired, passiveEffects, triggeredEffects));
+                    bonusTiers.add(new BonusTier(piecesRequired, passiveEffects, triggeredEffects));
                 }
                 
-                // --- Create Final SetBonus Object ---
                 SetBonus setBonus = new SetBonus(
                         setId,
                         config.getString("set_display_name", setId),
                         config.getStringList("required_enchantments"),
                         bonusTiers
                 );
-
                 registeredSets.put(setId.toLowerCase(), setBonus);
 
             } catch (Exception e) {
@@ -88,25 +85,28 @@ public final class SetBonusManager {
         }
         plugin.getLogger().info("Successfully loaded " + registeredSets.size() + " gear sets.");
     }
-
-    /**
-     * Retrieves a set bonus by its unique ID.
-     *
-     * @param id The case-insensitive ID of the set.
-     * @return The SetBonus object, or null if not found.
-     */
-    public SetBonus getSetById(String id) {
-        if (id == null) return null;
-        return registeredSets.get(id.toLowerCase());
-    }
-
+    
     /**
      * Gets an unmodifiable view of all registered set bonuses.
-     * This is used by the ActiveEffectTask to check player gear against all possible sets.
-     *
      * @return An unmodifiable Collection of all SetBonus objects.
      */
     public Collection<SetBonus> getAllSets() {
         return Collections.unmodifiableCollection(registeredSets.values());
     }
-}
+
+    /**
+     * A helper method for safely getting a list of a specific type from a map.
+     * @return A list of the specified type, or an empty list.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> List<T> getOrDefaultAsListOf(Map<?, ?> map, String key, Class<T> type) {
+        Object obj = map.get(key);
+        if (obj instanceof List && !((List<?>) obj).isEmpty()) {
+            // Check if the first element is of the correct type
+            if (type.isInstance(((List<?>) obj).get(0))) {
+                return (List<T>) obj;
+            }
+        }
+        return new ArrayList<>();
+    }
+                        }
