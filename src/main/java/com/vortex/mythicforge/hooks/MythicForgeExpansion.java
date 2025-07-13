@@ -1,16 +1,15 @@
 package com.vortex.mythicforge.hooks;
 
 import com.vortex.mythicforge.MythicForge;
-import com.vortex.mythicforge.enchants.SetBonus;
-import com.vortex.mythicforge.managers.ItemManager;
+import com.vortex.mythicforge.managers.SetBonusManager.ActiveBonus; // Assuming you have this record/class
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,7 +18,7 @@ import java.util.concurrent.TimeUnit;
  * display live data from MythicForge.
  *
  * @author Vortex
- * @version 1.0.0
+ * @version 1.0.1
  */
 public final class MythicForgeExpansion extends PlaceholderExpansion {
 
@@ -31,7 +30,6 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
 
     @Override
     public @NotNull String getIdentifier() {
-        // The identifier for our placeholders, e.g., %mythicforge_...%
         return "mythicforge";
     }
 
@@ -47,20 +45,19 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
 
     @Override
     public boolean persist() {
-        // This ensures the expansion is loaded and enabled with the plugin.
-        return true;
+        return true; // Keep this expansion loaded as long as MythicForge is enabled.
     }
 
     /**
-     * This is the core method where placeholder logic is handled.
-     * It's called by PlaceholderAPI whenever one of our placeholders is used.
+     * The core method for parsing placeholders.
+     * This signature correctly overrides the method from PlaceholderExpansion.
      *
      * @param player The player to get data for (can be offline).
      * @param params The placeholder identifier (e.g., "shop_timer").
      * @return The parsed value for the placeholder, or null if not found.
      */
     @Override
-    public String onPlaceholderRequest(OfflinePlayer player, @NotNull String params) {
+    public String onRequest(OfflinePlayer player, @NotNull String params) {
         switch (params.toLowerCase()) {
             // --- Global Placeholders ---
             case "shop_timer":
@@ -74,18 +71,15 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
                 return String.valueOf(plugin.getSetBonusManager().getAllSets().size());
 
             // --- Player-Specific Placeholders ---
-            // These require the player to be online.
             case "active_set_name":
-                if (player.isOnline()) {
-                    // This logic would live in your SetBonusManager
-                    // SetBonus activeSet = plugin.getSetBonusManager().getActiveSet(player.getPlayer());
-                    // return activeSet != null ? activeSet.getDisplayName() : "None";
-                    return "None"; // Placeholder logic
+                if (player != null && player.isOnline()) {
+                    Optional<ActiveBonus> activeBonus = plugin.getSetBonusManager().getActiveBonusFor(player.getPlayer());
+                    return activeBonus.map(b -> b.set().getDisplayName()).orElse("None");
                 }
-                return "";
+                return "Offline";
                 
             case "held_enchant_count":
-                if (player.isOnline()) {
+                if (player != null && player.isOnline()) {
                     Player onlinePlayer = player.getPlayer();
                     ItemStack itemInHand = onlinePlayer.getInventory().getItemInMainHand();
                     if (itemInHand != null && itemInHand.hasItemMeta()) {
@@ -94,11 +88,10 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
                     }
                     return "0";
                 }
-                return "";
+                return "Offline";
         }
 
-        // Return null if the placeholder is not recognized
-        return null;
+        return null; // Let PAPI know the placeholder was not recognized.
     }
 
     /**
