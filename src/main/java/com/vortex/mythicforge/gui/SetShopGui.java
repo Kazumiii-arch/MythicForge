@@ -22,7 +22,7 @@ import java.util.List;
  * Manages navigation between the main category view and individual set views.
  *
  * @author Vortex
- * @version 1.0.0
+ * @version 1.0.1
  */
 public final class SetShopGui extends AbstractGui {
 
@@ -30,40 +30,55 @@ public final class SetShopGui extends AbstractGui {
     private View currentView = View.MAIN_MENU;
     private String viewingCategory = null;
 
-    // NBT Keys for identifying items and their data within the GUI
-    private final NamespacedKey categoryKey = new NamespacedKey(plugin, "gui_category_id");
-    private final NamespacedKey actionKey = new NamespacedKey(plugin, "gui_action");
-    private final NamespacedKey priceKey = new NamespacedKey(plugin, "gui_price");
-    private final NamespacedKey itemDataKey = new NamespacedKey(plugin, "gui_item_data");
-
+    // NBT Keys to identify items and their actions within the GUI
+    private final NamespacedKey categoryKey;
+    private final NamespacedKey actionKey;
+    private final NamespacedKey priceKey;
+    private final NamespacedKey setIdKey;
+    private final NamespacedKey pieceIdKey;
 
     public SetShopGui(Player player) {
         super(player);
-        this.shopManager = plugin.getSetShopManager();
-        open();
+        if (player != null) { // Null check for dummy registration
+            this.shopManager = plugin.getSetShopManager();
+            this.categoryKey = new NamespacedKey(plugin, "gui_category_id");
+            this.actionKey = new NamespacedKey(plugin, "gui_action");
+            this.priceKey = new NamespacedKey(plugin, "gui_price");
+            this.setIdKey = new NamespacedKey(plugin, "gui_set_id");
+            this.pieceIdKey = new NamespacedKey(plugin, "gui_piece_id");
+            open();
+        } else {
+            // Dummy instance for registration, keys are not needed
+            this.shopManager = null;
+            this.categoryKey = null;
+            this.actionKey = null;
+            this.priceKey = null;
+            this.setIdKey = null;
+            this.pieceIdKey = null;
+        }
     }
 
     @Override
     protected Inventory createInventory() {
-        // The initial view is always the main menu.
         return buildMainMenuView();
     }
-    
-    // --- View Builders ---
 
     private Inventory buildMainMenuView() {
         this.currentView = View.MAIN_MENU;
+        this.viewingCategory = null;
         String title = ChatColor.translateAlternateColorCodes('&', shopManager.getShopConfig().getString("main_gui_title"));
-        Inventory gui = Bukkit.createInventory(this, 27, title);
+        Inventory gui = Bukkit.createInventory(null, 27, title);
 
         ConfigurationSection categories = shopManager.getShopConfig().getConfigurationSection("categories");
         if (categories != null) {
             for (String categoryId : categories.getKeys(false)) {
                 ConfigurationSection catConfig = categories.getConfigurationSection(categoryId);
-                Material material = Material.valueOf(catConfig.getString("display_item", "STONE").toUpperCase());
-                ItemStack catItem = new ItemStack(material);
+                if (catConfig == null) continue;
+
+                Material material = Material.matchMaterial(catConfig.getString("display_item", "STONE"));
+                ItemStack catItem = new ItemStack(material != null ? material : Material.STONE);
                 ItemMeta meta = catItem.getItemMeta();
-                meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', catConfig.getString("display_name")));
+                meta.setDisplayName(colorize(catConfig.getString("display_name")));
                 meta.setLore(colorize(catConfig.getStringList("lore")));
                 meta.getPersistentDataContainer().set(categoryKey, PersistentDataType.STRING, categoryId);
                 catItem.setItemMeta(meta);
@@ -76,27 +91,46 @@ public final class SetShopGui extends AbstractGui {
     private void openCategoryView(String categoryId) {
         this.currentView = View.CATEGORY;
         this.viewingCategory = categoryId;
+        String categoryDisplayName = shopManager.getShopConfig().getString("categories." + categoryId + ".display_name", "Shop");
         String title = ChatColor.translateAlternateColorCodes('&', shopManager.getShopConfig().getString("category_gui_title")
-                .replace("{category_name}", shopManager.getShopConfig().getString("categories." + categoryId + ".display_name")));
+                .replace("{category_name}", categoryDisplayName));
         
-        // Re-create the inventory for the new view
-        this.inventory = Bukkit.createInventory(this, 54, title);
+        this.inventory = Bukkit.createInventory(null, 54, title);
         
-        // ... (Logic to populate the inventory with gear set pieces from the config)
-        // ... (For each piece, create the item, add price to lore, and set NBT data for price/ID)
-
+        ConfigurationSection gearSets = shopManager.getShopConfig().getConfigurationSection("gear_sets");
+        if(gearSets != null) {
+            int slot = 0;
+            for(String setId : gearSets.getKeys(false)) {
+                if(Objects.equals(gearSets.getString(setId + ".category"), categoryId)) {
+                    ConfigurationSection pieces = gearSets.getConfigurationSection(setId + ".pieces");
+                    if (pieces == null) continue;
+                    for(String pieceId : pieces.getKeys(false)) {
+                        if (slot >= 45) break; // Stop if GUI is full
+                        ItemStack item = shopManager.getShopItem(setId, pieceId);
+                        if (item != null) {
+                            ItemMeta meta = item.getItemMeta();
+                            // Attach data to the item for the click handler to use
+                            meta.getPersistentDataContainer().set(priceKey, PersistentDataType.DOUBLE, pieces.getDouble(pieceId + ".price"));
+                            meta.getPersistentDataContainer().set(setIdKey, PersistentDataType.STRING, setId);
+                            meta.getPersistentDataContainer().set(pieceIdKey, PersistentDataType.STRING, pieceId);
+                            item.setItemMeta(meta);
+                            inventory.setItem(slot++, item);
+                        }
+                    }
+                }
+            }
+        }
+        
         // Add a "Back" button
         ItemStack backButton = new ItemStack(Material.BARRIER);
         ItemMeta meta = backButton.getItemMeta();
         meta.setDisplayName(ChatColor.RED + "" + ChatColor.BOLD + "Back to Categories");
         meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "back");
         backButton.setItemMeta(meta);
-        inventory.setItem(45, backButton);
+        inventory.setItem(49, backButton); // Center of bottom row
 
         player.openInventory(inventory);
     }
-    
-    // --- Event Handling ---
 
     @Override
     protected void handleClick(InventoryClickEvent event) {
@@ -108,33 +142,43 @@ public final class SetShopGui extends AbstractGui {
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
 
         if (currentView == View.MAIN_MENU && pdc.has(categoryKey, PersistentDataType.STRING)) {
-            // Player clicked a category, switch to that view
             String categoryId = pdc.get(categoryKey, PersistentDataType.STRING);
             openCategoryView(categoryId);
-        } else if (currentView == View.CATEGORY) {
-            // Player is in a category view
+            return;
+        }
+        
+        if (currentView == View.CATEGORY) {
             if (pdc.has(actionKey, PersistentDataType.STRING) && pdc.get(actionKey, PersistentDataType.STRING).equals("back")) {
-                // Player clicked the back button
-                this.inventory = buildMainMenuView();
-                player.openInventory(inventory);
+                // Re-open the main menu by creating a new instance
+                new SetShopGui(player);
                 return;
             }
 
             if (pdc.has(priceKey, PersistentDataType.DOUBLE)) {
-                // Player clicked an item to purchase
                 handlePurchase(clickedItem);
             }
         }
     }
 
     private void handlePurchase(ItemStack item) {
-        // ... (Full purchase logic similar to RotatingShopGui)
-        // 1. Get price from the item's NBT.
-        // 2. Check player balance via VaultHook.
-        // 3. Withdraw money, give item, play sounds, and send messages.
+        ItemMeta meta = item.getItemMeta();
+        double price = meta.getPersistentDataContainer().getOrDefault(priceKey, PersistentDataType.DOUBLE, -1.0);
+        String setId = meta.getPersistentDataContainer().get(setIdKey, PersistentDataType.STRING);
+        String pieceId = meta.getPersistentDataContainer().get(pieceIdKey, PersistentDataType.STRING);
+
+        if (price < 0 || setId == null || pieceId == null) return;
+        
+        // Full purchase logic using VaultHook
+        if(plugin.getVaultHook().hasEnough(player, price)) {
+            plugin.getVaultHook().withdraw(player, price);
+            // Give the player a *clean* version of the item from the manager
+            player.getInventory().addItem(shopManager.getShopItem(setId, pieceId));
+            player.sendMessage(ChatColor.GREEN + "You purchased " + meta.getDisplayName() + "!");
+        } else {
+            player.sendMessage(ChatColor.RED + "You cannot afford this item.");
+        }
     }
     
-    // Helper to colorize lists of strings
     private List<String> colorize(List<String> list) {
         List<String> coloredList = new ArrayList<>();
         for (String s : list) {
@@ -143,9 +187,9 @@ public final class SetShopGui extends AbstractGui {
         return coloredList;
     }
     
-    // Enum to manage which GUI view is currently active
-    private enum View {
-        MAIN_MENU,
-        CATEGORY
+    private String colorize(String s) {
+        return ChatColor.translateAlternateColorCodes('&', s);
     }
-          }
+    
+    private enum View { MAIN_MENU, CATEGORY }
+                                             }
