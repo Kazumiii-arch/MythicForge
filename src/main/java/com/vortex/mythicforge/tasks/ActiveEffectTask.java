@@ -10,6 +10,7 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -21,7 +22,7 @@ import java.util.*;
  * This is the core task that brings the advanced RPG systems to life.
  *
  * @author Vortex
- * @version 1.0.2
+ * @version 1.0.3
  */
 public final class ActiveEffectTask extends BukkitRunnable {
 
@@ -41,38 +42,48 @@ public final class ActiveEffectTask extends BukkitRunnable {
                 final Map<PotionEffectType, Integer> passivePotions = new HashMap<>();
                 final Map<Attribute, Double> attributeModifiers = new HashMap<>();
 
-                List<ItemStack> equippedItems = getEquippedItems(player);
-                
-                // 1. Gather effects from Runes
-                for (ItemStack item : equippedItems) {
-                    if (item == null || !item.hasItemMeta()) continue;
-                    List<String> socketedRunes = plugin.getItemManager().getSockets(item.getItemMeta());
-                    for (String runeId : socketedRunes) {
-                        Rune rune = plugin.getRuneManager().getRuneById(runeId);
-                        if (rune != null) {
-                            parseEffects(rune.getEffects(), passivePotions, attributeModifiers);
-                        }
-                    }
-                }
-
-                // 2. Gather effects from Set Bonuses
-                List<String> equippedEnchantIds = getEnchantIdsFromItems(equippedItems);
-                for (SetBonus set : plugin.getSetBonusManager().getAllSets()) {
-                    long equippedCount = set.getRequiredEnchantments().stream().filter(equippedEnchantIds::contains).count();
-                    if (equippedCount > 0) {
-                        List<String> setPassiveEffects = set.getEffectsForPieceCount((int) equippedCount);
-                        parseEffects(setPassiveEffects, passivePotions, attributeModifiers);
-                    }
-                }
-                
-                // 3. Apply all collected effects
-                applyAttributeModifiers(player, attributeModifiers);
-                applyPotionEffects(player, passivePotions);
+                gatherAllPassiveEffects(player, passivePotions, attributeModifiers);
+                applyAllEffects(player, passivePotions, attributeModifiers);
 
             } catch (Exception e) {
+                // Catch any unexpected errors for a single player without stopping the task for others.
                 plugin.getLogger().severe("Error updating active effects for player " + player.getName() + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
+    }
+
+    private void gatherAllPassiveEffects(Player player, Map<PotionEffectType, Integer> potions, Map<Attribute, Double> attributes) {
+        List<ItemStack> equippedItems = getEquippedItems(player);
+
+        // 1. Gather effects from Runes
+        for (ItemStack item : equippedItems) {
+            if (item == null || !item.hasItemMeta()) continue;
+            List<String> socketedRunes = plugin.getItemManager().getSockets(item.getItemMeta());
+            for (String runeId : socketedRunes) {
+                Rune rune = plugin.getRuneManager().getRuneById(runeId);
+                if (rune != null) {
+                    parseEffects(rune.getEffects(), potions, attributes);
+                }
+            }
+        }
+
+        // 2. Gather effects from Set Bonuses
+        List<String> equippedEnchantIds = getEnchantIdsFromItems(equippedItems);
+        for (SetBonus set : plugin.getSetBonusManager().getAllSets()) {
+            long equippedCount = set.getRequiredEnchantments().stream().filter(equippedEnchantIds::contains).count();
+            if (equippedCount > 0) {
+                // CORRECTED: Use the new getBonusTierFor method and handle the Optional result.
+                set.getBonusTierFor((int) equippedCount).ifPresent(tier -> 
+                    parseEffects(tier.getPassiveEffects(), potions, attributes)
+                );
+            }
+        }
+    }
+
+    private void applyAllEffects(Player player, Map<PotionEffectType, Integer> potions, Map<Attribute, Double> attributes) {
+        applyAttributeModifiers(player, attributes);
+        applyPotionEffects(player, potions);
     }
 
     private void applyAttributeModifiers(Player player, Map<Attribute, Double> modifiers) {
@@ -81,19 +92,16 @@ public final class ActiveEffectTask extends BukkitRunnable {
             AttributeInstance instance = player.getAttribute(attribute);
             if (instance == null) continue;
 
-            // Remove any old modifiers from this plugin to prevent stacking
-            for (AttributeModifier modifier : instance.getModifiers()) {
+            for (AttributeModifier modifier : new ArrayList<>(instance.getModifiers())) {
                 if (modifier.getName().startsWith("MythicForge-")) {
                     instance.removeModifier(modifier);
                 }
             }
 
-            // Apply the new, aggregated modifier if one exists for this attribute
             if (modifiers.containsKey(attribute)) {
                 double value = modifiers.get(attribute);
-                // Create a modifier with a unique name and UUID based on the player and attribute
                 AttributeModifier modifier = new AttributeModifier(
-                    UUID.nameUUIDFromBytes(("MythicForge-" + attribute.name() + "-" + player.getUniqueId()).getBytes()),
+                    UUID.nameUUIDFromBytes(("MythicForge-" + attribute.name()).getBytes()),
                     "MythicForge-" + attribute.name(),
                     value,
                     AttributeModifier.Operation.ADD_NUMBER
@@ -107,18 +115,15 @@ public final class ActiveEffectTask extends BukkitRunnable {
         Set<PotionEffectType> lastEffects = lastAppliedPotions.getOrDefault(player.getUniqueId(), new HashSet<>());
         Set<PotionEffectType> currentEffects = effects.keySet();
 
-        // Remove effects the player no longer qualifies for
         for (PotionEffectType oldEffect : lastEffects) {
             if (!currentEffects.contains(oldEffect)) {
                 player.removePotionEffect(oldEffect);
             }
         }
 
-        // Apply new or updated effects
-        effects.forEach((type, amplifier) -> {
-            // Apply for 3 seconds (60 ticks) with no particles. It will be refreshed next second.
-            player.addPotionEffect(new PotionEffect(type, 60, amplifier, true, false, false));
-        });
+        effects.forEach((type, amplifier) -> 
+            player.addPotionEffect(new PotionEffect(type, 60, amplifier, true, false, false))
+        );
         
         lastAppliedPotions.put(player.getUniqueId(), currentEffects);
     }
@@ -128,17 +133,15 @@ public final class ActiveEffectTask extends BukkitRunnable {
             String[] parts = effect.split(":");
             try {
                 if (parts[0].equalsIgnoreCase("POTION")) {
-                    PotionEffectType type = PotionEffectType.getByName(parts[1]);
+                    PotionEffectType type = PotionEffectType.getByName(parts[1].toUpperCase());
                     int amplifier = Integer.parseInt(parts[2]);
                     if (type != null) potions.merge(type, amplifier, Math::max);
                 } else if (parts[0].equalsIgnoreCase("ATTRIBUTE")) {
-                    Attribute attribute = Attribute.valueOf("GENERIC_" + parts[1]);
+                    Attribute attribute = Attribute.valueOf("GENERIC_" + parts[1].toUpperCase());
                     double value = Double.parseDouble(parts[3]);
-                    if(parts[2].equalsIgnoreCase("ADD")) attributes.merge(attribute, value, Double::sum);
+                    if (parts[2].equalsIgnoreCase("ADD")) attributes.merge(attribute, value, Double::sum);
                 }
-            } catch (Exception e) {
-                plugin.getLogger().warning("Could not parse passive effect: " + effect);
-            }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -151,13 +154,13 @@ public final class ActiveEffectTask extends BukkitRunnable {
     }
     
     private List<String> getEnchantIdsFromItems(List<ItemStack> items) {
-        List<String> ids = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
         for (ItemStack item : items) {
             if (item != null && item.hasItemMeta()) {
                 ids.addAll(plugin.getItemManager().getEnchants(item.getItemMeta()).keySet());
             }
         }
-        return new ArrayList<>(new HashSet<>(ids)); // Return list of unique IDs
+        return new ArrayList<>(ids);
     }
 
     private boolean isModifiableAttribute(Attribute attribute) {
@@ -174,4 +177,4 @@ public final class ActiveEffectTask extends BukkitRunnable {
                 return false;
         }
     }
-                                    }
+                        }
