@@ -17,9 +17,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Handles the GUI and logic for the item salvaging system. This class extends
@@ -27,11 +27,10 @@ import java.util.Objects;
  * only on the logic specific to salvaging.
  *
  * @author Vortex
- * @version 1.0.1
+ * @version 1.0.2
  */
 public final class SalvageGUI extends AbstractGui {
 
-    // NBT key to read enchantment data from the item being salvaged.
     private final NamespacedKey enchantsKey;
 
     // GUI Layout constants for easy modification and readability.
@@ -41,11 +40,12 @@ public final class SalvageGUI extends AbstractGui {
 
     public SalvageGUI(Player player) {
         super(player);
-        if (player != null) { // Null check for dummy registration
-             this.enchantsKey = new NamespacedKey(plugin, "mythic_enchants_json");
-             open(); // Immediately open the GUI upon creation for a player.
+        // A null check allows this class to be registered in onEnable without errors
+        if (player != null) {
+            this.enchantsKey = new NamespacedKey(plugin, "mythic_enchants_json");
+            open(); // Immediately open the GUI upon creation for a real player.
         } else {
-            this.enchantsKey = null; // Should not be used by dummy instance
+            this.enchantsKey = null;
         }
     }
 
@@ -57,24 +57,20 @@ public final class SalvageGUI extends AbstractGui {
     protected Inventory createInventory() {
         String title = ChatColor.translateAlternateColorCodes('&',
                 plugin.getConfig().getString("mechanics.salvage_system.gui_title", "&8Salvage Station"));
-        Inventory gui = Bukkit.createInventory(player, 27, title);
+        Inventory gui = Bukkit.createInventory(null, 27, title);
 
-        // Fill the background with decorative panes
         ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta paneMeta = pane.getItemMeta();
         paneMeta.setDisplayName(" ");
         pane.setItemMeta(paneMeta);
 
         for (int i = 0; i < gui.getSize(); i++) {
-            // Leave the interactive slots empty
             if (i != INPUT_SLOT && i != OUTPUT_SLOT) {
                 gui.setItem(i, pane);
             }
         }
 
-        // Place the initial confirm button
         updateSalvageButton(gui, 0);
-
         return gui;
     }
 
@@ -88,6 +84,7 @@ public final class SalvageGUI extends AbstractGui {
         if (event.getSlot() == INPUT_SLOT) {
             event.setCancelled(false);
             // Schedule a task to update the button 1 tick later, after the inventory has changed.
+            // This is required to get the correct item after the click event has finished.
             new BukkitRunnable() {
                 @Override
                 public void run() {
@@ -124,17 +121,14 @@ public final class SalvageGUI extends AbstractGui {
             }
 
             inventory.setItem(INPUT_SLOT, null); // Consume the item
+            // Important: Clear the output slot before adding the new item to prevent duplication bugs.
+            inventory.setItem(OUTPUT_SLOT, null); 
             inventory.setItem(OUTPUT_SLOT, plugin.getTomeManager().createMythicDust(dustYield)); // Give dust
             updateSalvageButton(inventory, 0); // Reset the confirm button
             player.playSound(player.getLocation(), Sound.BLOCK_GRINDSTONE_USE, 1.0f, 1.2f);
         }
     }
 
-    /**
-     * Calculates the amount of dust yielded from an item's enchantments.
-     * @param item The item to calculate the yield for.
-     * @return The total amount of dust to be returned.
-     */
     private int calculateDustYield(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return 0;
         
@@ -155,15 +149,9 @@ public final class SalvageGUI extends AbstractGui {
         return totalDust;
     }
 
-    /**
-     * Updates the confirm button's name, lore, and material based on the potential dust yield.
-     * @param inventory The GUI inventory.
-     * @param dustYield The calculated dust yield.
-     */
     private void updateSalvageButton(Inventory inventory, int dustYield) {
         boolean canSalvage = dustYield > 0;
-        Material material = canSalvage ? Material.LIME_STAINED_GLASS_PANE : Material.ANVIL;
-        ItemStack confirmButton = new ItemStack(material);
+        ItemStack confirmButton = new ItemStack(canSalvage ? Material.LIME_STAINED_GLASS_PANE : Material.ANVIL);
         ItemMeta confirmMeta = confirmButton.getItemMeta();
 
         if (canSalvage) {
