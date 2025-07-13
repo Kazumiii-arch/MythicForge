@@ -2,13 +2,15 @@ package com.vortex.mythicforge.utils;
 
 import com.vortex.mythicforge.MythicForge;
 import com.vortex.mythicforge.enchants.CustomEnchant;
+import com.vortex.mythicforge.enchants.SetBonus;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
@@ -24,7 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * from enchantments, runes, and set bonuses. This is the core scripting engine.
  *
  * @author Vortex
- * @version 1.0.2
+ * @version 1.0.3
  */
 public final class EffectProcessor {
 
@@ -52,31 +54,46 @@ public final class EffectProcessor {
         }
     }
 
+    /**
+     * Gathers and processes all effects for a specific entity and trigger type.
+     * It checks equipped items for enchantments and active set bonuses.
+     */
     private static void processAllEffectsFor(LivingEntity entity, TriggerType trigger, EntityDamageByEntityEvent event) {
-        // This method would gather effects from equipped items, runes, and set bonuses
-        // For now, we focus on the item enchantments to fix the compilation errors.
-        for (ItemStack item : getEquippedItems(entity)) {
-            Map<String, Integer> enchants = MythicForge.getInstance().getItemManager().getEnchants(item.getItemMeta());
-            for (Map.Entry<String, Integer> entry : enchants.entrySet()) {
-                CustomEnchant enchant = MythicForge.getInstance().getEnchantmentManager().getEnchantById(entry.getKey());
-                if (enchant == null) continue;
+        List<Map<?, ?>> allEffectGroups = new ArrayList<>();
+        Map<String, Integer> allEnchantsOnEntity = new HashMap<>();
 
-                for (Map<?, ?> effectGroup : enchant.getEffects()) {
-                    if (trigger.name().equalsIgnoreCase(String.valueOf(effectGroup.get("trigger")))) {
-                        String cooldownId = entity.getUniqueId().toString() + ":" + effectGroup.hashCode();
-                        if (checkConditions(effectGroup, entity, entry.getValue(), event, cooldownId)) {
-                            executeEffects(effectGroup, entity, entry.getValue(), event);
-                            if (getCooldownDuration(effectGroup) > 0) {
-                                startCooldown(entity.getUniqueId(), cooldownId);
-                            }
-                        }
+        // 1. Get effects from equipped items (enchantments)
+        for (ItemStack item : getEquippedItems(entity)) {
+            if (item == null || !item.hasItemMeta()) continue;
+            Map<String, Integer> itemEnchants = MythicForge.getInstance().getItemManager().getEnchants(item.getItemMeta());
+            allEnchantsOnEntity.putAll(itemEnchants);
+            for (String enchantId : itemEnchants.keySet()) {
+                CustomEnchant enchant = MythicForge.getInstance().getEnchantmentManager().getEnchantById(enchantId);
+                if (enchant != null) allEffectGroups.addAll(enchant.getEffects());
+            }
+        }
+
+        // 2. Get effects from active Set Bonuses
+        Optional<SetBonus.ActiveBonus> activeBonusOpt = MythicForge.getInstance().getSetBonusManager().getActiveBonusFor(entity);
+        if (activeBonusOpt.isPresent()) {
+            allEffectGroups.addAll(activeBonusOpt.get().tier().getTriggeredEffects());
+        }
+
+        // 3. Process all gathered effect groups
+        for (Map<?, ?> effectGroup : allEffectGroups) {
+            if (trigger.name().equalsIgnoreCase(String.valueOf(effectGroup.get("trigger")))) {
+                int level = 1; // Default level for set/rune effects
+                String cooldownId = entity.getUniqueId().toString() + ":" + effectGroup.hashCode();
+                
+                if (checkConditions(effectGroup, entity, level, event, cooldownId)) {
+                    executeEffects(effectGroup, entity, level, event);
+                    if (getCooldownDuration(effectGroup) > 0) {
+                        startCooldown(entity.getUniqueId(), cooldownId);
                     }
                 }
             }
         }
     }
-    
-    // --- All Helper Methods Now Fully Implemented ---
 
     private static boolean checkConditions(Map<?, ?> effectGroup, LivingEntity owner, int level, EntityDamageByEntityEvent event, String cooldownId) {
         List<String> conditions = (List<String>) effectGroup.get("conditions");
@@ -107,9 +124,80 @@ public final class EffectProcessor {
         List<String> effects = (List<String>) effectGroup.get("effects");
         if (effects == null) return;
         
+        LivingEntity target = (event.getEntity() instanceof LivingEntity) ? (LivingEntity) event.getEntity() : null;
+        LivingEntity attacker = (event.getDamager() instanceof LivingEntity) ? (LivingEntity) event.getDamager() : null;
+
         for (String effect : effects) {
             String[] parts = effect.split(":", 2);
-            // ... (Full implementation of the executeEffects switch statement from previous responses)
+            String type = parts[0].toUpperCase();
+            String args = parts.length > 1 ? parts[1] : "";
+
+            try {
+                switch (type) {
+                    case "DEAL_DAMAGE":
+                        if (target != null) {
+                            event.setDamage(event.getDamage() + evaluateExpression(args, level, event));
+                        }
+                        break;
+                    case "HEAL":
+                        double amount = evaluateExpression(args, level, event);
+                        owner.setHealth(Math.min(Objects.requireNonNull(owner.getAttribute(Attribute.GENERIC_MAX_HEALTH)).getValue(), owner.getHealth() + amount));
+                        break;
+                    case "TARGET_POTION":
+                        if (target != null) applyPotion(target, args);
+                        break;
+                    case "ATTACKER_POTION":
+                        if (attacker != null) applyPotion(attacker, args);
+                        break;
+                    case "ATTACKER_FIRE":
+                        if (attacker != null) attacker.setFireTicks(attacker.getFireTicks() + Integer.parseInt(args));
+                        break;
+                    case "PARTICLE":
+                        String[] pParts = args.split(" ");
+                        Location loc = target != null ? target.getLocation() : owner.getLocation();
+                        owner.getWorld().spawnParticle(Particle.valueOf(pParts[0].toUpperCase()), loc.add(0, 1, 0), 15, 0.5, 0.5, 0.5);
+                        break;
+                    case "SOUND":
+                        String[] sParts = args.split(" ");
+                        owner.getWorld().playSound(owner.getLocation(), Sound.valueOf(sParts[0].toUpperCase()), 1.0f, Float.parseFloat(sParts[1]));
+                        break;
+                    case "AOE_EFFECT":
+                        if (target != null) {
+                            String[] aoeParts = args.split(" ", 3);
+                            double radius = Double.parseDouble(aoeParts[1].split(":")[1]);
+                            String innerEffect = aoeParts[2];
+                            for (Entity nearby : target.getNearbyEntities(radius, radius, radius)) {
+                                if (nearby instanceof LivingEntity && !nearby.equals(owner)) {
+                                    String[] innerParts = innerEffect.replace("'", "").split(":", 2);
+                                    if (innerParts[0].equalsIgnoreCase("POTION")) applyPotion((LivingEntity) nearby, innerParts[1]);
+                                }
+                            }
+                        }
+                        break;
+                }
+            } catch (Exception e) {
+                MythicForge.getInstance().getLogger().warning("Could not execute effect: " + effect + " | Error: " + e.getMessage());
+            }
+        }
+    }
+
+    private static double evaluateExpression(String expression, int level, Event event) {
+        try {
+            double damage = (event instanceof EntityDamageByEntityEvent) ? ((EntityDamageByEntityEvent) event).getFinalDamage() : 0;
+            String processed = expression
+                    .replace("{level_number}", String.valueOf(level))
+                    .replace("{damage}", String.valueOf(damage));
+            return Double.parseDouble(scriptEngine.eval(processed).toString());
+        } catch (Exception e) { return 0.0; }
+    }
+    
+    private static void applyPotion(LivingEntity entity, String args) {
+        String[] parts = args.split(":");
+        PotionEffectType type = PotionEffectType.getByName(parts[0].toUpperCase());
+        if (type != null) {
+            int amplifier = Integer.parseInt(parts[1]);
+            int duration = Integer.parseInt(parts[2]);
+            entity.addPotionEffect(new PotionEffect(type, duration, amplifier));
         }
     }
 
@@ -121,18 +209,15 @@ public final class EffectProcessor {
         cooldowns.computeIfAbsent(uuid, k -> new HashMap<>()).put(id, System.currentTimeMillis());
     }
     
-    private static long getCooldownDuration(Map<?, ?> effectGroup) {
-        // ... (Full implementation of getCooldownDuration from previous responses) ...
+    private static int getCooldownDuration(Map<?, ?> effectGroup) {
+        List<String> conditions = (List<String>) effectGroup.get("conditions");
+        if (conditions == null) return 0;
+        for (String condition : conditions) {
+            if (condition.toLowerCase().startsWith("cooldown")) {
+                return Integer.parseInt(condition.split(" ")[1]);
+            }
+        }
         return 0;
-    }
-    
-    private static double evaluateExpression(String expression, int level, EntityDamageByEntityEvent event) {
-        try {
-            String processed = expression
-                    .replace("{level_number}", String.valueOf(level))
-                    .replace("{damage}", String.valueOf(event.getFinalDamage()));
-            return Double.parseDouble(scriptEngine.eval(processed).toString());
-        } catch (Exception e) { return 0.0; }
     }
 
     private static List<ItemStack> getEquippedItems(LivingEntity entity) {
@@ -142,4 +227,4 @@ public final class EffectProcessor {
         items.removeIf(Objects::isNull);
         return items;
     }
-                                                                                                                   }
+                }
