@@ -1,7 +1,7 @@
 // ========================================================================
 // File: build.gradle.kts
 // Location: /build.gradle.kts
-// Project: MythicForge (Adapted for FancyNPC)
+// Project: MythicForge (Corrected Dependency)
 // ========================================================================
 plugins {
     java
@@ -14,7 +14,7 @@ version = "1.0.0"
 repositories {
     mavenCentral()
     maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
-    maven { url = uri("https://jitpack.io/") } // For Vault and FancyNPCs
+    maven { url = uri("https://jitpack.io/") } // For Vault and FancyNpcs
     maven { url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/") }
 }
 
@@ -23,9 +23,9 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // REMOVED: Citizens dependency
-    // ADDED: FancyNpcs dependency, which is found on Jitpack
-    compileOnly("de.oliver:FancyNpcs:2.5.0")
+    // CORRECTED: This is the proper JitPack format for FancyNpcs.
+    // The format is 'com.github.GitHubUser:RepositoryName:VersionTag'
+    compileOnly("com.github.Oliver-N:FancyNpcs:v2.5.0")
 }
 
 java {
