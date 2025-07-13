@@ -8,17 +8,20 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 /**
  * Manages the loading, storage, and retrieval of all gear set bonuses
- * from the /sets/ directory.
+ * from the /sets/ directory. It also provides utility methods to determine
+ * a player's active set bonus.
  *
  * @author Vortex
- * @version 1.0.3
+ * @version 1.0.4
  */
 public final class SetBonusManager {
 
@@ -26,7 +29,7 @@ public final class SetBonusManager {
     private final Map<String, SetBonus> registeredSets = new HashMap<>();
 
     /**
-     * A simple public record to hold the result of a set check. Clean and modern.
+     * A simple public record to hold the result of a set check.
      */
     public record ActiveBonus(SetBonus set, BonusTier tier) {}
 
@@ -60,14 +63,24 @@ public final class SetBonusManager {
                 List<BonusTier> bonusTiers = new ArrayList<>();
                 for (Map<?, ?> rawTier : rawBonusTiers) {
                     Object piecesObj = rawTier.get("pieces_required");
-                    if (!(piecesObj instanceof Integer)) {
-                        plugin.getLogger().warning("Skipping bonus tier in '" + setId + "': 'pieces_required' is not a valid number.");
-                        continue;
-                    }
+                    if (!(piecesObj instanceof Integer)) continue;
                     int piecesRequired = (Integer) piecesObj;
 
-                    List<String> passiveEffects = getSafelyTypedList(rawTier, "passive_effects", String.class);
-                    List<Map<?, ?>> triggeredEffects = getSafelyTypedList(rawTier, "triggered_effects", Map.class);
+                    // --- DEFINITIVE FIX for the "incompatible types" compiler error ---
+                    List<String> passiveEffects = new ArrayList<>();
+                    if (rawTier.get("passive_effects") instanceof List) {
+                        for(Object effect : (List<?>) rawTier.get("passive_effects")) {
+                            if(effect instanceof String) passiveEffects.add((String) effect);
+                        }
+                    }
+
+                    List<Map<?, ?>> triggeredEffects = new ArrayList<>();
+                    if (rawTier.get("triggered_effects") instanceof List) {
+                        for(Object effect : (List<?>) rawTier.get("triggered_effects")) {
+                            if(effect instanceof Map) triggeredEffects.add((Map<?, ?>) effect);
+                        }
+                    }
+                    // --- END FIX ---
 
                     bonusTiers.add(new BonusTier(piecesRequired, passiveEffects, triggeredEffects));
                 }
@@ -85,7 +98,7 @@ public final class SetBonusManager {
         }
         plugin.getLogger().info("Loaded " + registeredSets.size() + " gear sets.");
     }
-
+    
     /**
      * Checks a player's gear and determines the highest-tier set bonus they have active.
      * @param player The player to check.
@@ -138,16 +151,4 @@ public final class SetBonusManager {
         }
         return new ArrayList<>(ids);
     }
-
-    @SuppressWarnings("unchecked")
-    private <T> List<T> getSafelyTypedList(Map<?, ?> map, String key, Class<T> type) {
-        Object obj = map.get(key);
-        if (obj instanceof List) {
-            List<?> rawList = (List<?>) obj;
-            if (rawList.isEmpty() || rawList.stream().allMatch(type::isInstance)) {
-                return (List<T>) rawList;
-            }
-        }
-        return new ArrayList<>();
-    }
-                                       }
+                        }
