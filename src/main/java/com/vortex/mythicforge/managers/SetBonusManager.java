@@ -5,21 +5,17 @@ import com.vortex.mythicforge.enchants.SetBonus;
 import com.vortex.mythicforge.enchants.SetBonus.BonusTier;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 /**
  * Manages the loading, storage, and retrieval of all gear set bonuses
- * from the /sets/ directory. It also provides utility methods to determine
- * a player's active set bonus.
+ * from the /sets/ directory.
  *
  * @author Vortex
- * @version 1.0.1
+ * @version 1.0.2
  */
 public final class SetBonusManager {
 
@@ -45,7 +41,10 @@ public final class SetBonusManager {
         }
 
         File[] setFiles = setsDir.listFiles((dir, name) -> name.endsWith(".yml"));
-        if (setFiles == null) return;
+        if (setFiles == null) {
+            plugin.getLogger().warning("Could not read files from the /sets/ directory.");
+            return;
+        }
 
         for (File file : setFiles) {
             FileConfiguration config = YamlConfiguration.loadConfiguration(file);
@@ -57,14 +56,20 @@ public final class SetBonusManager {
                 }
 
                 List<Map<?, ?>> rawBonusTiers = config.getMapList("bonuses");
-                if (rawBonusTiers.isEmpty()) continue;
+                if (rawBonusTiers == null || rawBonusTiers.isEmpty()) {
+                    plugin.getLogger().warning("Skipping set '" + setId + "': No 'bonuses' section found or it is empty.");
+                    continue;
+                }
 
                 List<BonusTier> bonusTiers = new ArrayList<>();
                 for (Map<?, ?> rawTier : rawBonusTiers) {
-                    if (!(rawTier.get("pieces_required") instanceof Integer)) continue;
+                    if (!(rawTier.get("pieces_required") instanceof Integer)) {
+                        plugin.getLogger().warning("Skipping bonus tier in '" + setId + "': 'pieces_required' is not a valid number.");
+                        continue;
+                    }
                     int piecesRequired = (int) rawTier.get("pieces_required");
                     
-                    // Safe parsing for lists
+                    // CORRECTED: Using a type-safe helper method to prevent cast exceptions.
                     List<String> passiveEffects = getOrDefaultAsListOf(rawTier, "passive_effects", String.class);
                     List<Map<?, ?>> triggeredEffects = getOrDefaultAsListOf(rawTier, "triggered_effects", Map.class);
 
@@ -77,6 +82,7 @@ public final class SetBonusManager {
                         config.getStringList("required_enchantments"),
                         bonusTiers
                 );
+
                 registeredSets.put(setId.toLowerCase(), setBonus);
 
             } catch (Exception e) {
@@ -85,9 +91,11 @@ public final class SetBonusManager {
         }
         plugin.getLogger().info("Successfully loaded " + registeredSets.size() + " gear sets.");
     }
-    
+
     /**
-     * Gets an unmodifiable view of all registered set bonuses.
+     * Gets an unmodifiable view of all registered set bonuses. This is used by the
+     * ActiveEffectTask to check a player's gear against all possible sets.
+     *
      * @return An unmodifiable Collection of all SetBonus objects.
      */
     public Collection<SetBonus> getAllSets() {
@@ -95,18 +103,25 @@ public final class SetBonusManager {
     }
 
     /**
-     * A helper method for safely getting a list of a specific type from a map.
-     * @return A list of the specified type, or an empty list.
+     * Safely gets a List of a specific type from a map, returning an empty list on failure.
+     * This prevents ClassCastExceptions from malformed configurations.
+     *
+     * @param map The map to get data from.
+     * @param key The key for the list.
+     * @param type The class of the elements expected in the list.
+     * @return A List of the specified type, or an empty list if not found or type mismatch.
      */
     @SuppressWarnings("unchecked")
     private <T> List<T> getOrDefaultAsListOf(Map<?, ?> map, String key, Class<T> type) {
         Object obj = map.get(key);
-        if (obj instanceof List && !((List<?>) obj).isEmpty()) {
-            // Check if the first element is of the correct type
-            if (type.isInstance(((List<?>) obj).get(0))) {
+        if (obj instanceof List) {
+            // Check if the list is not empty before checking the type of its elements
+            if (!((List<?>) obj).isEmpty() && type.isInstance(((List<?>) obj).get(0))) {
                 return (List<T>) obj;
+            } else if (((List<?>) obj).isEmpty()) {
+                 return (List<T>) obj; // Return the empty list
             }
         }
-        return new ArrayList<>();
+        return new ArrayList<>(); // Return a new empty list on failure
     }
-                        }
+    }
