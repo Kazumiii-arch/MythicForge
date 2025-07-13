@@ -8,15 +8,7 @@ import org.bukkit.entity.Entity;
 
 import java.util.Optional;
 
-/**
- * Handles all interactions with the FancyNpcs plugin API.
- * Provides a safe layer of communication for all NPC-related features.
- *
- * @author Vortex
- * @version 1.0.0
- */
 public final class FancyNpcHook {
-
     private final boolean isEnabled;
     private static final String NPC_ROLE_METADATA_KEY = "mythicforge_role";
 
@@ -30,33 +22,18 @@ public final class FancyNpcHook {
         }
     }
 
-    public boolean isEnabled() {
-        return isEnabled;
-    }
+    public boolean isEnabled() { return isEnabled; }
 
-    /**
-     * Assigns a MythicForge role to a FancyNPC.
-     * @param npc The FancyNPC to assign the role to.
-     * @param role The role to assign (e.g., "enchant_shop").
-     */
     public void setNpcRole(Npc npc, String role) {
         if (!isEnabled || npc == null) return;
-        npc.getData().set(NPC_ROLE_METADATA_KEY, role.toLowerCase());
-        // FancyNpcs typically handles saving automatically
+        npc.getData().addPersistentData(NPC_ROLE_METADATA_KEY, role.toLowerCase());
     }
 
-    /**
-     * Gets the MythicForge role of a FancyNPC.
-     * @param entity The entity that was interacted with.
-     * @return An Optional containing the role name if it exists, otherwise empty.
-     */
     public Optional<String> getNpcRole(Entity entity) {
         if (!isEnabled) return Optional.empty();
-        
-        Npc npc = FancyNpcs.getInstance().getNpcManager().getNpc(entity);
+        Npc npc = FancyNpcs.api().getNpc(entity);
         if (npc != null) {
-            String role = npc.getData().get(NPC_ROLE_METADATA_KEY);
-            return Optional.ofNullable(role);
+            return Optional.ofNullable(npc.getData().getPersistentData(NPC_ROLE_METADATA_KEY));
         }
         return Optional.empty();
     }
