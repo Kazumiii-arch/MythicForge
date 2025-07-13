@@ -4,9 +4,8 @@ import com.vortex.mythicforge.MythicForge;
 import com.vortex.mythicforge.enchants.CustomEnchant;
 import com.vortex.mythicforge.enchants.Rune;
 import com.vortex.mythicforge.gui.SalvageGUI;
-import net.citizensnpcs.api.CitizensAPI;
-import net.citizensnpcs.api.npc.NPC;
-import net.citizensnpcs.api.trait.trait.Owner;
+import com.vortex.mythicforge.listeners.NpcListener;
+import de.oliver.fancynpcs.api.Npc;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -24,9 +23,12 @@ import java.util.stream.Collectors;
 
 /**
  * Handles all administrative and player commands for the MythicForge plugin.
- * Implements TabCompleter for a user-friendly command experience.
+ * Implements TabCompleter for a user-friendly, context-aware command experience.
+ *
+ * @author Vortex
+ * @version 1.0.1
  */
-public class MythicForgeCommand implements CommandExecutor, TabCompleter {
+public final class MythicForgeCommand implements CommandExecutor, TabCompleter {
 
     private final MythicForge plugin = MythicForge.getInstance();
 
@@ -40,7 +42,6 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
 
         String subCommand = args[0].toLowerCase();
 
-        // Use a switch for clean command delegation
         switch (subCommand) {
             case "give":
                 return handleGiveCommand(sender, args);
@@ -50,7 +51,8 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
                 return handleSalvageCommand(sender);
             case "npc":
                 return handleNpcCommand(sender, args);
-            // Add cases for 'shop', 'help', etc. here
+            case "shop":
+                return handleShopCommand(sender, args);
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown subcommand. Use /mf help.");
                 return true;
@@ -62,7 +64,6 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "You do not have permission.");
             return true;
         }
-        // Updated Usage: /mf give <player> <type> <id> [amount/level]
         if (args.length < 4) {
             sender.sendMessage(ChatColor.RED + "Usage: /mf give <player> <type> <id> [amount/level]");
             sender.sendMessage(ChatColor.GRAY + "Types: enchant, rune, item, setpiece");
@@ -79,46 +80,55 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
         String id = args[3];
         int amount = 1;
         if (args.length > 4) {
-            try {
-                amount = Integer.parseInt(args[4]);
-            } catch (NumberFormatException e) {
+            try { amount = Integer.parseInt(args[4]); } catch (NumberFormatException e) {
                 sender.sendMessage(ChatColor.RED + "Invalid amount/level.");
                 return true;
             }
         }
 
-        // Delegate to specific give methods based on type
-        // For example:
-        if (type.equals("enchant")) {
-            ItemStack itemInHand = target.getInventory().getItemInMainHand();
-            CustomEnchant enchant = plugin.getEnchantmentManager().getEnchantById(id);
-            if (enchant == null) {
-                sender.sendMessage(ChatColor.RED + "Enchantment '" + id + "' not found.");
-                return true;
-            }
-            plugin.getItemManager().applyEnchant(itemInHand, enchant, amount);
-            sender.sendMessage(ChatColor.GREEN + "Applied " + id + " to " + target.getName() + "'s item.");
-        } else if (type.equals("rune")) {
-            // ... Logic to give a rune item using TomeManager ...
-        } else if (type.equals("item")) {
-            // ... Logic to give dust, orbs, chisel using TomeManager ...
-        } else if (type.equals("setpiece")) {
-            // ... Logic to give a set piece using SetShopManager ...
-        } else {
-            sender.sendMessage(ChatColor.RED + "Invalid item type. Use: enchant, rune, item, setpiece.");
+        switch (type) {
+            case "enchant":
+                ItemStack itemInHand = target.getInventory().getItemInMainHand();
+                if (itemInHand.getType().isAir()) {
+                    sender.sendMessage(ChatColor.RED + "Target player is not holding an item.");
+                    return true;
+                }
+                CustomEnchant enchant = plugin.getEnchantmentManager().getEnchantById(id);
+                if (enchant == null) {
+                    sender.sendMessage(ChatColor.RED + "Enchantment '" + id + "' not found.");
+                    return true;
+                }
+                plugin.getItemManager().applyEnchant(itemInHand, enchant, amount);
+                sender.sendMessage(ChatColor.GREEN + "Applied " + id + " to " + target.getName() + "'s item.");
+                break;
+            case "rune":
+                // Rune rune = plugin.getRuneManager().getRuneById(id);
+                // if (rune == null) { ... }
+                // target.getInventory().addItem(plugin.getTomeManager().createRuneItem(rune, amount));
+                break;
+            case "item":
+                target.getInventory().addItem(plugin.getTomeManager().createCustomItem(id, amount));
+                sender.sendMessage(ChatColor.GREEN + "Gave " + amount + " of " + id + " to " + target.getName() + ".");
+                break;
+            default:
+                sender.sendMessage(ChatColor.RED + "Invalid item type. Use: enchant, rune, item.");
+                break;
         }
         return true;
     }
 
     private boolean handleReloadCommand(CommandSender sender) {
-        // ... (permission check) ...
-        // Reload all configurations
+        if (!sender.hasPermission("mythicforge.admin.reload")) {
+            sender.sendMessage(ChatColor.RED + "You do not have permission.");
+            return true;
+        }
         plugin.reloadConfig();
         plugin.getEnchantmentManager().loadEnchantments();
         plugin.getRuneManager().loadRunes();
         plugin.getSetBonusManager().loadSets();
-        plugin.getSetShopManager().loadSetShopConfig();
-        sender.sendMessage(ChatColor.GREEN + "MythicForge configurations reloaded.");
+        plugin.getSetShopManager().loadAndCacheShopItems();
+        plugin.getShopManager().forceRefreshStock();
+        sender.sendMessage(ChatColor.GREEN + "MythicForge has been fully reloaded.");
         return true;
     }
 
@@ -127,11 +137,7 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "This command can only be used by players.");
             return true;
         }
-        if (!sender.hasPermission("mythicforge.command.salvage")) {
-            sender.sendMessage(ChatColor.RED + "You do not have permission.");
-            return true;
-        }
-        new SalvageGUI().open((Player) sender);
+        new SalvageGUI((Player) sender);
         return true;
     }
 
@@ -140,31 +146,33 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "You do not have permission.");
             return true;
         }
-        // Usage: /mf npc set <role>
         if (args.length < 3 || !args[1].equalsIgnoreCase("set")) {
             sender.sendMessage(ChatColor.RED + "Usage: /mf npc set <role>");
             return true;
         }
         if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "You must be a player to set an NPC's role.");
+            sender.sendMessage(ChatColor.RED + "You must be a player to use this command.");
             return true;
         }
 
-        // This requires the Citizens API to be present
-        if (!plugin.getCitizensHook().isEnabled()) {
-            sender.sendMessage(ChatColor.RED + "Citizens plugin not found. This feature is disabled.");
-            return true;
-        }
-
-        NPC selectedNpc = CitizensAPI.getDefaultNPCSelector().getSelected(sender);
-        if (selectedNpc == null) {
-            sender.sendMessage(ChatColor.RED + "You must have an NPC selected. Use /npc select.");
-            return true;
-        }
-        
+        Player player = (Player) sender;
         String role = args[2].toLowerCase();
-        plugin.getCitizensHook().setNpcRole(selectedNpc, role);
-        sender.sendMessage(ChatColor.GREEN + "Successfully set NPC " + selectedNpc.getName() + "'s role to: " + role);
+        NpcListener.setPlayerForRoleAssignment(player, role);
+        player.sendMessage(ChatColor.GREEN + "Please right-click the NPC you wish to assign the '" + role + "' role to.");
+        return true;
+    }
+
+    private boolean handleShopCommand(CommandSender sender, String[] args) {
+         if (!sender.hasPermission("mythicforge.admin.shop")) {
+            sender.sendMessage(ChatColor.RED + "You do not have permission.");
+            return true;
+        }
+        if (args.length < 2 || !args[1].equalsIgnoreCase("refresh")) {
+            sender.sendMessage(ChatColor.RED + "Usage: /mf shop refresh");
+            return true;
+        }
+        plugin.getShopManager().forceRefreshStock();
+        sender.sendMessage(ChatColor.GREEN + "The rotating shop stock has been forcefully refreshed.");
         return true;
     }
 
@@ -178,18 +186,19 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
         } else if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "give":
-                    // Suggest online player names
                     for (Player p : Bukkit.getOnlinePlayers()) { completions.add(p.getName()); }
                     break;
                 case "npc":
-                    if (sender.hasPermission("mythicforge.admin.npc")) { completions.add("set"); }
+                    if (sender.hasPermission("mythicforge.admin.npc")) completions.add("set");
                     break;
-                // Add cases for 'shop', etc.
+                case "shop":
+                     if (sender.hasPermission("mythicforge.admin.shop")) completions.add("refresh");
+                     break;
             }
         } else if (args.length == 3) {
             switch (args[0].toLowerCase()) {
                 case "give":
-                    completions.addAll(Arrays.asList("enchant", "rune", "item", "setpiece"));
+                    completions.addAll(Arrays.asList("enchant", "rune", "item"));
                     break;
                 case "npc":
                     if (args[1].equalsIgnoreCase("set")) {
@@ -197,22 +206,19 @@ public class MythicForgeCommand implements CommandExecutor, TabCompleter {
                     }
                     break;
             }
-        } else if (args.length == 4) {
-            if (args[0].equalsIgnoreCase("give")) {
-                switch (args[2].toLowerCase()) {
-                    case "enchant":
-                        completions.addAll(plugin.getEnchantmentManager().getRegisteredEnchants().keySet());
-                        break;
-                    case "rune":
-                        // completions.addAll(plugin.getRuneManager().getRegisteredRunes().keySet());
-                        break;
-                    case "item":
-                        // completions.addAll(plugin.getConfig().getConfigurationSection("mechanics.custom_items").getKeys(false));
-                        break;
-                }
+        } else if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
+            switch (args[2].toLowerCase()) {
+                case "enchant":
+                    completions.addAll(plugin.getEnchantmentManager().getRegisteredEnchants().keySet());
+                    break;
+                case "rune":
+                    completions.addAll(plugin.getRuneManager().getRegisteredRunes().keySet());
+                    break;
+                case "item":
+                    completions.addAll(plugin.getConfig().getConfigurationSection("mechanics.custom_items").getKeys(false));
+                    break;
             }
         }
-        
-        return StringUtil.copyPartialMatches(args[args.length-1], completions, new ArrayList<>());
+        return StringUtil.copyPartialMatches(args[args.length - 1], completions, new ArrayList<>());
     }
-                   }
+}
