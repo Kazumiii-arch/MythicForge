@@ -8,38 +8,17 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.inventory.meta.ItemMeta;
-
 import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
-/**
- * Manages the loading, storage, and retrieval of all gear set bonuses
- * from the /sets/ directory. It also provides utility methods to determine
- * a player's active set bonus.
- *
- * @author Vortex
- * @version 1.0.4
- */
 public final class SetBonusManager {
-
     private final MythicForge plugin;
     private final Map<String, SetBonus> registeredSets = new HashMap<>();
-
-    /**
-     * A simple public record to hold the result of a set check.
-     */
     public record ActiveBonus(SetBonus set, BonusTier tier) {}
 
-    public SetBonusManager(MythicForge plugin) {
-        this.plugin = plugin;
-    }
+    public SetBonusManager(MythicForge plugin) { this.plugin = plugin; }
 
-    /**
-     * Clears existing set bonuses and loads all .yml files from the /sets/ directory.
-     */
     public void loadSets() {
         registeredSets.clear();
         File setsDir = new File(plugin.getDataFolder(), "sets");
@@ -47,50 +26,24 @@ public final class SetBonusManager {
             setsDir.mkdirs();
             plugin.saveResource("sets/wither_king.yml", false);
         }
-
         File[] setFiles = setsDir.listFiles((dir, name) -> name.endsWith(".yml"));
         if (setFiles == null) return;
-
         for (File file : setFiles) {
             FileConfiguration config = YamlConfiguration.loadConfiguration(file);
             try {
                 String setId = config.getString("set_id");
                 if (setId == null || setId.isEmpty()) continue;
-
                 List<Map<?, ?>> rawBonusTiers = config.getMapList("bonuses");
                 if (rawBonusTiers == null) continue;
-
                 List<BonusTier> bonusTiers = new ArrayList<>();
                 for (Map<?, ?> rawTier : rawBonusTiers) {
-                    Object piecesObj = rawTier.get("pieces_required");
-                    if (!(piecesObj instanceof Integer)) continue;
-                    int piecesRequired = (Integer) piecesObj;
-
-                    // --- DEFINITIVE FIX for the "incompatible types" compiler error ---
-                    List<String> passiveEffects = new ArrayList<>();
-                    if (rawTier.get("passive_effects") instanceof List) {
-                        for(Object effect : (List<?>) rawTier.get("passive_effects")) {
-                            if(effect instanceof String) passiveEffects.add((String) effect);
-                        }
-                    }
-
-                    List<Map<?, ?>> triggeredEffects = new ArrayList<>();
-                    if (rawTier.get("triggered_effects") instanceof List) {
-                        for(Object effect : (List<?>) rawTier.get("triggered_effects")) {
-                            if(effect instanceof Map) triggeredEffects.add((Map<?, ?>) effect);
-                        }
-                    }
-                    // --- END FIX ---
-
+                    // DEFINITIVE FIX for the generics compiler error.
+                    int piecesRequired = (int) rawTier.getOrDefault("pieces_required", 0);
+                    List<String> passiveEffects = getSafelyTypedList(rawTier, "passive_effects", String.class);
+                    List<Map<?, ?>> triggeredEffects = getSafelyTypedList(rawTier, "triggered_effects", Map.class);
                     bonusTiers.add(new BonusTier(piecesRequired, passiveEffects, triggeredEffects));
                 }
-                
-                SetBonus setBonus = new SetBonus(
-                        setId,
-                        config.getString("set_display_name", setId),
-                        config.getStringList("required_enchantments"),
-                        bonusTiers
-                );
+                SetBonus setBonus = new SetBonus(setId, config.getString("set_display_name", setId), config.getStringList("required_enchantments"), bonusTiers);
                 registeredSets.put(setId.toLowerCase(), setBonus);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Error loading set bonus file: " + file.getName(), e);
@@ -99,17 +52,11 @@ public final class SetBonusManager {
         plugin.getLogger().info("Loaded " + registeredSets.size() + " gear sets.");
     }
     
-    /**
-     * Checks a player's gear and determines the highest-tier set bonus they have active.
-     * @param player The player to check.
-     * @return An Optional containing the ActiveBonus record, or empty if none are active.
-     */
     public Optional<ActiveBonus> getActiveBonusFor(Player player) {
         if (player == null) return Optional.empty();
         List<String> equippedEnchantIds = getEnchantIdsFromItems(getEquippedItems(player));
         SetBonus bestSet = null;
         int maxPieces = 0;
-
         for (SetBonus set : registeredSets.values()) {
             int currentPieces = (int) set.getRequiredEnchantments().stream().filter(equippedEnchantIds::contains).count();
             if (currentPieces > maxPieces) {
@@ -117,7 +64,6 @@ public final class SetBonusManager {
                 bestSet = set;
             }
         }
-
         if (bestSet != null) {
             Optional<BonusTier> bestTier = bestSet.getBonusTierFor(maxPieces);
             return bestTier.map(tier -> new ActiveBonus(bestSet, tier));
@@ -125,15 +71,8 @@ public final class SetBonusManager {
         return Optional.empty();
     }
 
-    /**
-     * @return An unmodifiable Collection of all registered SetBonus objects.
-     */
-    public Collection<SetBonus> getAllSets() {
-        return Collections.unmodifiableCollection(registeredSets.values());
-    }
+    public Collection<SetBonus> getAllSets() { return Collections.unmodifiableCollection(registeredSets.values()); }
     
-    // --- Private Helper Methods ---
-
     private List<ItemStack> getEquippedItems(Player player) {
         PlayerInventory inv = player.getInventory();
         List<ItemStack> items = new ArrayList<>(Arrays.asList(inv.getArmorContents()));
@@ -151,4 +90,16 @@ public final class SetBonusManager {
         }
         return new ArrayList<>(ids);
     }
-                        }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> getSafelyTypedList(Map<?, ?> map, String key, Class<T> type) {
+        Object obj = map.get(key);
+        if (obj instanceof List) {
+            List<?> rawList = (List<?>) obj;
+            if (rawList.isEmpty() || rawList.stream().allMatch(type::isInstance)) {
+                return (List<T>) rawList;
+            }
+        }
+        return new ArrayList<>();
+    }
+}
