@@ -3,8 +3,9 @@ package com.vortex.mythicforge.hooks;
 import com.vortex.mythicforge.MythicForge;
 import de.oliver.fancynpcs.api.FancyNpcs;
 import de.oliver.fancynpcs.api.Npc;
-import de.oliver.fancynpcs.api.NpcData; // Added missing import
+import de.oliver.fancynpcs.api.NpcData;
 import org.bukkit.entity.Entity;
+import org.bukkit.persistence.PersistentDataType;
 import java.util.Optional;
 
 public final class FancyNpcHook {
@@ -23,16 +24,16 @@ public final class FancyNpcHook {
 
     public void setNpcRole(Npc npc, String role) {
         if (!isEnabled || npc == null) return;
-        // CORRECTED: The API requires a key and an object, not two strings.
-        npc.getData().setPersistentData(NPC_ROLE_METADATA_KEY, role.toLowerCase());
+        NpcData data = npc.getData();
+        data.addPersistentData(NPC_ROLE_METADATA_KEY, role.toLowerCase());
     }
 
     public Optional<String> getNpcRole(Entity entity) {
         if (!isEnabled) return Optional.empty();
         Npc npc = FancyNpcs.api().getNpc(entity);
         if (npc != null) {
-            // CORRECTED: The API returns a String directly.
-            return Optional.ofNullable(npc.getData().getPersistentData(NPC_ROLE_METADATA_KEY, PersistentDataType.STRING));
+            NpcData data = npc.getData();
+            return Optional.ofNullable(data.getPersistentData(NPC_ROLE_METADATA_KEY, PersistentDataType.STRING));
         }
         return Optional.empty();
     }
