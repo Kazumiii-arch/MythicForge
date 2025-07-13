@@ -1,10 +1,7 @@
 package com.vortex.mythicforge;
 
 import com.vortex.mythicforge.commands.MythicForgeCommand;
-import com.vortex.mythicforge.gui.RotatingShopGui;
-import com.vortex.mythicforge.gui.SalvageGUI;
-import com.vortex.mythicforge.gui.SetShopGui;
-import com.vortex.mythicforge.hooks.FancyNpcHook; // UPDATED
+import com.vortex.mythicforge.hooks.FancyNpcHook;
 import com.vortex.mythicforge.hooks.MythicForgeExpansion;
 import com.vortex.mythicforge.hooks.VaultHook;
 import com.vortex.mythicforge.listeners.GlobalListener;
@@ -19,9 +16,10 @@ import org.bukkit.plugin.java.JavaPlugin;
  * The main class for the MythicForge plugin. This class handles the core
  * functionality, including the enabling and disabling of the plugin, initialization
  * of all managers, registration of listeners and commands, and scheduling of tasks.
+ * It serves as the central hub for all plugin components.
  *
  * @author Vortex
- * @version 1.0.0
+ * @version 1.0.2
  */
 public final class MythicForge extends JavaPlugin {
 
@@ -38,7 +36,7 @@ public final class MythicForge extends JavaPlugin {
     
     // API Hooks
     private VaultHook vaultHook;
-    private FancyNpcHook fancyNpcHook; // UPDATED
+    private FancyNpcHook fancyNpcHook;
 
     @Override
     public void onEnable() {
@@ -46,33 +44,33 @@ public final class MythicForge extends JavaPlugin {
         
         // --- 1. Configuration & Data Loading ---
         saveDefaultConfig();
-        // The managers will handle their own specific configs (runes.yml, etc.)
         
         // --- 2. Initialize All Managers ---
+        // Data managers that read from files are loaded first.
         this.enchantmentManager = new EnchantmentManager(this);
         this.runeManager = new RuneManager(this);
         this.setBonusManager = new SetBonusManager(this);
+        this.setShopManager = new SetShopManager(this);
+        
+        // Functional managers that may depend on data.
         this.itemManager = new ItemManager(this);
         this.tomeManager = new TomeManager(this);
-        this.setShopManager = new SetShopManager(this);
         this.shopManager = new ShopManager(this);
         
         // --- 3. Initialize API Hooks ---
         this.vaultHook = new VaultHook(this);
-        this.fancyNpcHook = new FancyNpcHook(this); // UPDATED
+        this.fancyNpcHook = new FancyNpcHook(this);
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new MythicForgeExpansion(this).register();
         }
 
-        // --- 4. Register Event Listeners ---
+        // --- 4. Register Persistent Event Listeners ---
+        // Our GUI framework handles registering/unregistering its own listeners,
+        // so we only need to register the main, always-on listeners here.
         getServer().getPluginManager().registerEvents(new GlobalListener(), this);
         getServer().getPluginManager().registerEvents(new InventoryListener(this), this);
         getServer().getPluginManager().registerEvents(new TomeListener(this), this);
         getServer().getPluginManager().registerEvents(new NpcListener(), this);
-        // Registering GUI listeners (a dummy instance is fine for registration purposes)
-        new SalvageGUI(null); 
-        new RotatingShopGui(null);
-        new SetShopGui(null);
 
         // --- 5. Register Commands ---
         MythicForgeCommand commandExecutor = new MythicForgeCommand();
@@ -80,6 +78,7 @@ public final class MythicForge extends JavaPlugin {
         getCommand("mythicforge").setTabCompleter(commandExecutor);
         
         // --- 6. Schedule Repeating Tasks ---
+        // This starts last, after everything else is fully loaded.
         new ActiveEffectTask(this).runTaskTimer(this, 100L, 20L);
 
         getLogger().info("MythicForge v" + getDescription().getVersion() + " by Vortex has been fully enabled.");
@@ -88,6 +87,8 @@ public final class MythicForge extends JavaPlugin {
     @Override
     public void onDisable() {
         // Future logic for saving data on shutdown could go here.
+        // For now, cancel all tasks to ensure a clean shutdown.
+        getServer().getScheduler().cancelTasks(this);
         getLogger().info("MythicForge has been disabled.");
     }
 
@@ -102,12 +103,5 @@ public final class MythicForge extends JavaPlugin {
     public ShopManager getShopManager() { return shopManager; }
     public SetShopManager getSetShopManager() { return setShopManager; }
     public VaultHook getVaultHook() { return vaultHook; }
-    
-    /**
-     * Gets the handler for FancyNpcs API interactions.
-     * @return The FancyNpcHook instance.
-     */
-    public FancyNpcHook getFancyNpcHook() { // UPDATED
-        return fancyNpcHook;
-    }
-}
+    public FancyNpcHook getFancyNpcHook() { return fancyNpcHook; }
+                                        }
