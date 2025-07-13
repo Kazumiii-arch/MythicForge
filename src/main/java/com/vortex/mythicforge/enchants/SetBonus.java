@@ -1,7 +1,6 @@
 package com.vortex.mythicforge.enchants;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * A final, immutable data object representing a complete gear set bonus,
@@ -10,7 +9,7 @@ import java.util.stream.Collectors;
  * tiered bonuses to a player.
  *
  * @author Vortex
- * @version 1.0.0
+ * @version 1.0.1
  */
 public final class SetBonus {
 
@@ -38,30 +37,31 @@ public final class SetBonus {
         this.setId = Objects.requireNonNull(setId, "Set ID cannot be null.");
         this.displayName = Objects.requireNonNull(displayName, "Set display name cannot be null.");
 
-        // Defensive copies to ensure immutability
+        // Create defensive copies to ensure immutability
         this.requiredEnchantments = new ArrayList<>(Objects.requireNonNull(requiredEnchantments, "Required enchantments list cannot be null."));
         this.bonuses = new ArrayList<>(Objects.requireNonNull(bonusTiers, "Bonus tiers list cannot be null."));
         
-        // Sort bonuses by pieces required to make lookups easier and more reliable.
+        // Pre-sort the bonuses by pieces required in descending order.
+        // This is a performance optimization for fast lookups later.
         this.bonuses.sort(Comparator.comparingInt(BonusTier::getPiecesRequired).reversed());
     }
 
     /**
-     * Gets the passive effects for the highest bonus tier the player qualifies for.
+     * Gets the highest bonus tier a player qualifies for based on their piece count.
      *
      * @param equippedPieceCount The number of set pieces the player has equipped.
-     * @return A list of passive effect strings, or an empty list if no bonus is met.
+     * @return An Optional containing the best matching BonusTier, or an empty Optional if none are met.
      */
-    public List<String> getEffectsForPieceCount(int equippedPieceCount) {
-        // Since the list is sorted from highest to lowest, the first match is the best one.
+    public Optional<BonusTier> getBonusTierFor(int equippedPieceCount) {
+        // Since the list is pre-sorted from highest to lowest, the first match is the best one.
         for (BonusTier tier : bonuses) {
             if (equippedPieceCount >= tier.getPiecesRequired()) {
-                return tier.getPassiveEffects();
+                return Optional.of(tier);
             }
         }
-        return Collections.emptyList();
+        return Optional.empty();
     }
-    
+
     // --- Standard Getters ---
 
     public String getSetId() { return setId; }
@@ -71,7 +71,7 @@ public final class SetBonus {
 
 
     /**
-     * A static nested class to cleanly represent a single tier of a set bonus.
+     * A static nested data class to cleanly represent a single tier of a set bonus.
      * This is more professional and type-safe than using a raw Map.
      */
     public static final class BonusTier {
@@ -81,8 +81,8 @@ public final class SetBonus {
 
         public BonusTier(int piecesRequired, List<String> passiveEffects, List<Map<?, ?>> triggeredEffects) {
             this.piecesRequired = piecesRequired;
-            this.passiveEffects = new ArrayList<>(Objects.requireNonNull(passiveEffects, "Passive effects list cannot be null."));
-            this.triggeredEffects = new ArrayList<>(Objects.requireNonNull(triggeredEffects, "Triggered effects list cannot be null."));
+            this.passiveEffects = new ArrayList<>(Objects.requireNonNull(passiveEffects));
+            this.triggeredEffects = new ArrayList<>(Objects.requireNonNull(triggeredEffects));
         }
 
         public int getPiecesRequired() { return piecesRequired; }
