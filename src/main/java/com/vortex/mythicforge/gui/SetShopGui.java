@@ -14,8 +14,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Handles the advanced, multi-layered GUI for the Pre-Made Set Gear Shop.
@@ -28,7 +28,6 @@ public final class SetShopGui extends AbstractGui {
 
     private final SetShopManager shopManager;
     private View currentView = View.MAIN_MENU;
-    private String viewingCategory = null;
 
     // NBT Keys to identify items and their actions within the GUI
     private final NamespacedKey categoryKey;
@@ -39,22 +38,18 @@ public final class SetShopGui extends AbstractGui {
 
     public SetShopGui(Player player) {
         super(player);
-        if (player != null) { // Null check for dummy registration
+        if (player != null) { // Null check allows for dummy registration
             this.shopManager = plugin.getSetShopManager();
-            this.categoryKey = new NamespacedKey(plugin, "gui_category_id");
-            this.actionKey = new NamespacedKey(plugin, "gui_action");
-            this.priceKey = new NamespacedKey(plugin, "gui_price");
-            this.setIdKey = new NamespacedKey(plugin, "gui_set_id");
-            this.pieceIdKey = new NamespacedKey(plugin, "gui_piece_id");
+            this.categoryKey = new NamespacedKey(plugin, "mf_gui_category_id");
+            this.actionKey = new NamespacedKey(plugin, "mf_gui_action");
+            this.priceKey = new NamespacedKey(plugin, "mf_gui_price");
+            this.setIdKey = new NamespacedKey(plugin, "mf_gui_set_id");
+            this.pieceIdKey = new NamespacedKey(plugin, "mf_gui_piece_id");
             open();
         } else {
-            // Dummy instance for registration, keys are not needed
             this.shopManager = null;
-            this.categoryKey = null;
-            this.actionKey = null;
-            this.priceKey = null;
-            this.setIdKey = null;
-            this.pieceIdKey = null;
+            this.categoryKey = null; this.actionKey = null; this.priceKey = null;
+            this.setIdKey = null; this.pieceIdKey = null;
         }
     }
 
@@ -65,8 +60,7 @@ public final class SetShopGui extends AbstractGui {
 
     private Inventory buildMainMenuView() {
         this.currentView = View.MAIN_MENU;
-        this.viewingCategory = null;
-        String title = ChatColor.translateAlternateColorCodes('&', shopManager.getShopConfig().getString("main_gui_title"));
+        String title = colorize(shopManager.getShopConfig().getString("main_gui_title"));
         Inventory gui = Bukkit.createInventory(null, 27, title);
 
         ConfigurationSection categories = shopManager.getShopConfig().getConfigurationSection("categories");
@@ -78,6 +72,8 @@ public final class SetShopGui extends AbstractGui {
                 Material material = Material.matchMaterial(catConfig.getString("display_item", "STONE"));
                 ItemStack catItem = new ItemStack(material != null ? material : Material.STONE);
                 ItemMeta meta = catItem.getItemMeta();
+                if(meta == null) continue;
+
                 meta.setDisplayName(colorize(catConfig.getString("display_name")));
                 meta.setLore(colorize(catConfig.getStringList("lore")));
                 meta.getPersistentDataContainer().set(categoryKey, PersistentDataType.STRING, categoryId);
@@ -90,27 +86,28 @@ public final class SetShopGui extends AbstractGui {
 
     private void openCategoryView(String categoryId) {
         this.currentView = View.CATEGORY;
-        this.viewingCategory = categoryId;
         String categoryDisplayName = shopManager.getShopConfig().getString("categories." + categoryId + ".display_name", "Shop");
-        String title = ChatColor.translateAlternateColorCodes('&', shopManager.getShopConfig().getString("category_gui_title")
+        String title = colorize(shopManager.getShopConfig().getString("category_gui_title")
                 .replace("{category_name}", categoryDisplayName));
         
         this.inventory = Bukkit.createInventory(null, 54, title);
         
         ConfigurationSection gearSets = shopManager.getShopConfig().getConfigurationSection("gear_sets");
-        if(gearSets != null) {
+        if (gearSets != null) {
             int slot = 0;
-            for(String setId : gearSets.getKeys(false)) {
-                if(Objects.equals(gearSets.getString(setId + ".category"), categoryId)) {
+            for (String setId : gearSets.getKeys(false)) {
+                if (Objects.equals(gearSets.getString(setId + ".category"), categoryId)) {
                     ConfigurationSection pieces = gearSets.getConfigurationSection(setId + ".pieces");
                     if (pieces == null) continue;
-                    for(String pieceId : pieces.getKeys(false)) {
-                        if (slot >= 45) break; // Stop if GUI is full
+                    for (String pieceId : pieces.getKeys(false)) {
+                        if (slot >= 45) break;
                         ItemStack item = shopManager.getShopItem(setId, pieceId);
                         if (item != null) {
                             ItemMeta meta = item.getItemMeta();
+                            double price = pieces.getDouble(pieceId + ".price");
+                            
                             // Attach data to the item for the click handler to use
-                            meta.getPersistentDataContainer().set(priceKey, PersistentDataType.DOUBLE, pieces.getDouble(pieceId + ".price"));
+                            meta.getPersistentDataContainer().set(priceKey, PersistentDataType.DOUBLE, price);
                             meta.getPersistentDataContainer().set(setIdKey, PersistentDataType.STRING, setId);
                             meta.getPersistentDataContainer().set(pieceIdKey, PersistentDataType.STRING, pieceId);
                             item.setItemMeta(meta);
@@ -149,11 +146,9 @@ public final class SetShopGui extends AbstractGui {
         
         if (currentView == View.CATEGORY) {
             if (pdc.has(actionKey, PersistentDataType.STRING) && pdc.get(actionKey, PersistentDataType.STRING).equals("back")) {
-                // Re-open the main menu by creating a new instance
-                new SetShopGui(player);
+                new SetShopGui(player); // Re-open the main menu
                 return;
             }
-
             if (pdc.has(priceKey, PersistentDataType.DOUBLE)) {
                 handlePurchase(clickedItem);
             }
@@ -162,29 +157,28 @@ public final class SetShopGui extends AbstractGui {
 
     private void handlePurchase(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
-        double price = meta.getPersistentDataContainer().getOrDefault(priceKey, PersistentDataType.DOUBLE, -1.0);
-        String setId = meta.getPersistentDataContainer().get(setIdKey, PersistentDataType.STRING);
-        String pieceId = meta.getPersistentDataContainer().get(pieceIdKey, PersistentDataType.STRING);
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        double price = pdc.getOrDefault(priceKey, PersistentDataType.DOUBLE, -1.0);
+        String setId = pdc.get(setIdKey, PersistentDataType.STRING);
+        String pieceId = pdc.get(pieceIdKey, PersistentDataType.STRING);
 
         if (price < 0 || setId == null || pieceId == null) return;
         
-        // Full purchase logic using VaultHook
-        if(plugin.getVaultHook().hasEnough(player, price)) {
-            plugin.getVaultHook().withdraw(player, price);
-            // Give the player a *clean* version of the item from the manager
-            player.getInventory().addItem(shopManager.getShopItem(setId, pieceId));
-            player.sendMessage(ChatColor.GREEN + "You purchased " + meta.getDisplayName() + "!");
+        if (plugin.getVaultHook().hasEnough(player, price)) {
+            if(plugin.getVaultHook().withdraw(player, price).transactionSuccess()) {
+                ItemStack cleanItem = shopManager.getShopItem(setId, pieceId);
+                player.getInventory().addItem(cleanItem);
+                player.sendMessage(ChatColor.GREEN + "You purchased " + cleanItem.getItemMeta().getDisplayName() + "!");
+            } else {
+                 player.sendMessage(ChatColor.RED + "An unexpected economy error occurred.");
+            }
         } else {
             player.sendMessage(ChatColor.RED + "You cannot afford this item.");
         }
     }
     
     private List<String> colorize(List<String> list) {
-        List<String> coloredList = new ArrayList<>();
-        for (String s : list) {
-            coloredList.add(ChatColor.translateAlternateColorCodes('&', s));
-        }
-        return coloredList;
+        return list.stream().map(this::colorize).collect(Collectors.toList());
     }
     
     private String colorize(String s) {
@@ -192,4 +186,4 @@ public final class SetShopGui extends AbstractGui {
     }
     
     private enum View { MAIN_MENU, CATEGORY }
-                                             }
+}
