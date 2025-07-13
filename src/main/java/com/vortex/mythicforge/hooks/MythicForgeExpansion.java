@@ -1,7 +1,7 @@
 package com.vortex.mythicforge.hooks;
 
 import com.vortex.mythicforge.MythicForge;
-import com.vortex.mythicforge.managers.SetBonusManager.ActiveBonus; // Assuming you have this record/class
+import com.vortex.mythicforge.managers.SetBonusManager.ActiveBonus;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -15,10 +15,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * PlaceholderAPI Expansion for MythicForge.
  * This class handles all placeholder requests, allowing other plugins to
- * display live data from MythicForge.
+ * display live data from MythicForge on scoreboards, holograms, etc.
+ *
+ * Placeholders:
+ * %mythicforge_shop_timer%
+ * %mythicforge_total_enchants%
+ * %mythicforge_total_runes%
+ * %mythicforge_total_sets%
+ * %mythicforge_active_set_name%
+ * %mythicforge_held_enchant_count%
  *
  * @author Vortex
- * @version 1.0.1
+ * @version 1.0.2
  */
 public final class MythicForgeExpansion extends PlaceholderExpansion {
 
@@ -50,7 +58,7 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
 
     /**
      * The core method for parsing placeholders.
-     * This signature correctly overrides the method from PlaceholderExpansion.
+     * This signature correctly overrides the method from PlaceholderExpansion, fixing the build error.
      *
      * @param player The player to get data for (can be offline).
      * @param params The placeholder identifier (e.g., "shop_timer").
@@ -74,6 +82,7 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
             case "active_set_name":
                 if (player != null && player.isOnline()) {
                     Optional<ActiveBonus> activeBonus = plugin.getSetBonusManager().getActiveBonusFor(player.getPlayer());
+                    // Use modern Java Optional handling to safely get the name or a default value.
                     return activeBonus.map(b -> b.set().getDisplayName()).orElse("None");
                 }
                 return "Offline";
@@ -91,7 +100,8 @@ public final class MythicForgeExpansion extends PlaceholderExpansion {
                 return "Offline";
         }
 
-        return null; // Let PAPI know the placeholder was not recognized.
+        // Let PAPI know the placeholder was not recognized.
+        return null;
     }
 
     /**
