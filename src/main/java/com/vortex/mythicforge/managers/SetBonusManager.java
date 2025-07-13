@@ -12,7 +12,6 @@ import org.bukkit.inventory.PlayerInventory;
 import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 /**
  * Manages the loading, storage, and retrieval of all gear set bonuses
@@ -25,7 +24,7 @@ public final class SetBonusManager {
 
     private final MythicForge plugin;
     private final Map<String, SetBonus> registeredSets = new HashMap<>();
-    
+
     /**
      * A simple public record to hold the result of a set check. Clean and modern.
      */
@@ -60,7 +59,6 @@ public final class SetBonusManager {
 
                 List<BonusTier> bonusTiers = new ArrayList<>();
                 for (Map<?, ?> rawTier : rawBonusTiers) {
-                    // This is the definitive fix for the generics compiler error.
                     Object piecesObj = rawTier.get("pieces_required");
                     if (!(piecesObj instanceof Integer)) {
                         plugin.getLogger().warning("Skipping bonus tier in '" + setId + "': 'pieces_required' is not a valid number.");
@@ -87,7 +85,7 @@ public final class SetBonusManager {
         }
         plugin.getLogger().info("Loaded " + registeredSets.size() + " gear sets.");
     }
-    
+
     /**
      * Checks a player's gear and determines the highest-tier set bonus they have active.
      * @param player The player to check.
@@ -152,4 +150,4 @@ public final class SetBonusManager {
         }
         return new ArrayList<>();
     }
-                     }
+                                       }
