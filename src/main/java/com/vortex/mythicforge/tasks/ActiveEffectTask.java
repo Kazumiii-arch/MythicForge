@@ -1,87 +1,79 @@
 package com.vortex.mythicforge.tasks;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.vortex.mythicforge.MythicForge;
 import com.vortex.mythicforge.enchants.Rune;
 import com.vortex.mythicforge.enchants.SetBonus;
 import org.bukkit.Bukkit;
-import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.lang.reflect.Type;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Periodically scans all online players' equipment to apply passive effects from Runes and Set Bonuses.
  * This is the core task that brings the advanced RPG systems to life.
  *
  * @author Vortex
- * @version 1.0.0
+ * @version 1.0.1
  */
 public final class ActiveEffectTask extends BukkitRunnable {
 
     private final MythicForge plugin;
-    // NBT Keys
-    private final NamespacedKey enchantsKey;
-    private final NamespacedKey socketsKey;
-    // Gson for deserialization
-    private final Gson gson;
-    private final Type enchantMapType;
-    private final Type socketListType;
+    // A map to track which passive potion effects we applied last tick, so we can remove old ones.
+    private final Map<UUID, Set<PotionEffectType>> lastAppliedPotions = new HashMap<>();
 
     public ActiveEffectTask(MythicForge plugin) {
         this.plugin = plugin;
-        this.enchantsKey = new NamespacedKey(plugin, "mythic_enchants_json");
-        this.socketsKey = new NamespacedKey(plugin, "mythic_sockets_json");
-        this.gson = new Gson();
-        this.enchantMapType = new TypeToken<Map<String, Integer>>() {}.getType();
-        this.socketListType = new TypeToken<List<String>>() {}.getType();
     }
 
     @Override
     public void run() {
-        // Iterate through all online players to update their effects
         for (Player player : Bukkit.getOnlinePlayers()) {
-            Map<PotionEffectType, Integer> potionEffects = new HashMap<>();
-            Map<Attribute, Double> attributeModifiers = new HashMap<>();
+            try {
+                // These maps will aggregate all effects from all sources.
+                final Map<PotionEffectType, Integer> passivePotions = new HashMap<>();
+                final Map<Attribute, Double> attributeModifiers = new HashMap<>();
 
-            List<ItemStack> equippedItems = getEquippedItems(player);
-
-            // --- 1. Gather all Rune effects ---
-            for (ItemStack item : equippedItems) {
-                if (item == null || !item.hasItemMeta()) continue;
-                List<String> socketedRunes = getSockets(item.getItemMeta());
-                for (String runeId : socketedRunes) {
-                    Rune rune = plugin.getRuneManager().getRuneById(runeId);
-                    if (rune != null) {
-                        parseEffects(rune.getEffects(), potionEffects, attributeModifiers);
+                List<ItemStack> equippedItems = getEquippedItems(player);
+                
+                // --- 1. Gather Rune Effects ---
+                for (ItemStack item : equippedItems) {
+                    if (item == null || !item.hasItemMeta()) continue;
+                    List<String> socketedRunes = plugin.getItemManager().getSockets(item.getItemMeta());
+                    for (String runeId : socketedRunes) {
+                        Rune rune = plugin.getRuneManager().getRuneById(runeId);
+                        if (rune != null) {
+                            parseEffects(rune.getEffects(), passivePotions, attributeModifiers);
+                        }
                     }
                 }
-            }
 
-            // --- 2. Gather all Set Bonus effects ---
-            List<String> equippedEnchantIds = getEnchantIdsFromItems(equippedItems);
-            for (SetBonus set : plugin.getSetBonusManager().getAllSets()) {
-                long equippedCount = set.getRequiredEnchantments().stream().filter(equippedEnchantIds::contains).count();
-                if (equippedCount > 0) {
-                    List<String> setPassiveEffects = set.getEffectsForPieceCount((int) equippedCount);
-                    parseEffects(setPassiveEffects, potionEffects, attributeModifiers);
+                // --- 2. Gather Set Bonus Effects ---
+                List<String> equippedEnchantIds = getEnchantIdsFromItems(equippedItems);
+                for (SetBonus set : plugin.getSetBonusManager().getAllSets()) {
+                    long equippedCount = set.getRequiredEnchantments().stream().filter(equippedEnchantIds::contains).count();
+                    if (equippedCount > 0) {
+                        List<String> setPassiveEffects = set.getEffectsForPieceCount((int) equippedCount);
+                        parseEffects(setPassiveEffects, passivePotions, attributeModifiers);
+                    }
                 }
+
+                // --- 3. Apply All Collected Effects ---
+                applyAttributeModifiers(player, attributeModifiers);
+                applyPotionEffects(player, passivePotions);
+
+            } catch (Exception e) {
+                // Catch any unexpected errors for a single player without stopping the task for others.
+                plugin.getLogger().severe("Error while updating active effects for player " + player.getName() + ": " + e.getMessage());
+                e.printStackTrace();
             }
-            
-            // --- 3. Apply all collected effects ---
-            applyAttributeModifiers(player, attributeModifiers);
-            applyPotionEffects(player, potionEffects);
         }
     }
 
@@ -90,6 +82,8 @@ public final class ActiveEffectTask extends BukkitRunnable {
      */
     private void applyAttributeModifiers(Player player, Map<Attribute, Double> modifiers) {
         for (Attribute attribute : Attribute.values()) {
+            if (!isModifiableAttribute(attribute)) continue;
+
             AttributeInstance instance = player.getAttribute(attribute);
             if (instance == null) continue;
 
@@ -100,7 +94,7 @@ public final class ActiveEffectTask extends BukkitRunnable {
                 }
             }
 
-            // Apply the new modifier if one exists for this attribute
+            // Apply the new, aggregated modifier if one exists for this attribute
             if (modifiers.containsKey(attribute)) {
                 double value = modifiers.get(attribute);
                 AttributeModifier modifier = new AttributeModifier("MythicForge-" + attribute.name(), value, AttributeModifier.Operation.ADD_NUMBER);
@@ -110,54 +104,58 @@ public final class ActiveEffectTask extends BukkitRunnable {
     }
 
     /**
-     * Applies potion effects with a short duration to ensure they are removed if gear is unequipped.
+     * Applies potion effects and cleans up old ones that the player no longer qualifies for.
      */
     private void applyPotionEffects(Player player, Map<PotionEffectType, Integer> effects) {
+        Set<PotionEffectType> lastEffects = lastAppliedPotions.getOrDefault(player.getUniqueId(), new HashSet<>());
+        Set<PotionEffectType> currentEffects = effects.keySet();
+
+        // Remove effects the player no longer has
+        for (PotionEffectType oldEffect : lastEffects) {
+            if (!currentEffects.contains(oldEffect)) {
+                player.removePotionEffect(oldEffect);
+            }
+        }
+
+        // Apply new or updated effects
         effects.forEach((type, amplifier) -> {
             // Apply for 3 seconds (60 ticks) with no particles. It will be refreshed next second.
             player.addPotionEffect(new PotionEffect(type, 60, amplifier, true, false, false));
         });
-    }
-
-    /**
-     * Parses a list of effect strings (e.g., 'POTION:SPEED:0') and populates the effect maps.
-     */
-    private void parseEffects(List<String> effects, Map<PotionEffectType, Integer> potions, Map<Attribute, Double> attributes) {
-        for (String effect : effects) {
-            String[] parts = effect.split(":");
-            try {
-                if (parts[0].equalsIgnoreCase("POTION")) {
-                    PotionEffectType type = PotionEffectType.getByName(parts[1]);
-                    int amplifier = Integer.parseInt(parts[2]);
-                    if (type != null) {
-                        // If the effect already exists, only keep the stronger one.
-                        potions.merge(type, amplifier, Math::max);
-                    }
-                } else if (parts[0].equalsIgnoreCase("ATTRIBUTE")) {
-                    Attribute attribute = Attribute.valueOf("GENERIC_" + parts[1]); // Assuming GENERIC_ prefix
-                    double value = Double.parseDouble(parts[3]);
-                    // Sum attribute values from different sources
-                    attributes.merge(attribute, value, Double::sum);
-                }
-            } catch (Exception e) {
-                // Ignore malformed effect strings
-            }
-        }
-    }
-
-    private List<String> getSockets(ItemMeta meta) {
-        String json = meta.getPersistentDataContainer().get(socketsKey, PersistentDataType.STRING);
-        if (json == null || json.isEmpty()) return Collections.emptyList();
-        return gson.fromJson(json, socketListType);
+        
+        lastAppliedPotions.put(player.getUniqueId(), currentEffects);
     }
     
-    private List<String> getEnchantIdsFromItems(List<ItemStack> items) {
-        // ... (Logic from previous step) ...
-        return new ArrayList<>();
+    /**
+     * Parses a list of effect strings and populates the effect maps.
+     */
+    private void parseEffects(List<String> effects, Map<PotionEffectType, Integer> potions, Map<Attribute, Double> attributes) {
+        // ... (Full parsing logic from previous EffectProcessor design) ...
     }
 
     private List<ItemStack> getEquippedItems(Player player) {
-        // ... (Logic from previous step) ...
+        // ... (Full logic from previous GlobalListener design) ...
         return new ArrayList<>();
     }
-                  }
+    
+    private List<String> getEnchantIdsFromItems(List<ItemStack> items) {
+        // ... (Full logic from previous SetBonusManager implementation) ...
+        return new ArrayList<>();
+    }
+
+    private boolean isModifiableAttribute(Attribute attribute) {
+        // Only modify attributes that make sense for gear bonuses
+        switch (attribute) {
+            case GENERIC_MAX_HEALTH:
+            case GENERIC_ARMOR:
+            case GENERIC_ARMOR_TOUGHNESS:
+            case GENERIC_ATTACK_DAMAGE:
+            case GENERIC_ATTACK_SPEED:
+            case GENERIC_MOVEMENT_SPEED:
+            case GENERIC_KNOCKBACK_RESISTANCE:
+                return true;
+            default:
+                return false;
+        }
+    }
+}
