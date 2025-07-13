@@ -12,11 +12,11 @@ import org.bukkit.inventory.ItemStack;
 
 /**
  * A global listener for core gameplay events that can trigger custom abilities.
- * This class acts as the main entry point, delegating all complex logic to
- * the EffectProcessor to keep the code clean and efficient.
+ * This class acts as the main entry point for delegating actions to the
+ * EffectProcessor to keep the code clean and efficient.
  *
  * @author Vortex
- * @version 1.0.1
+ * @version 1.0.2
  */
 public final class GlobalListener implements Listener {
 
@@ -46,11 +46,11 @@ public final class GlobalListener implements Listener {
         if (tool.getType().isAir()) {
             return;
         }
-        
-        // TODO: Create and call EffectProcessor.processMineEvent(event)
+
+        // TODO: Create and call a new 'EffectProcessor.processMineEvent(event)'
         // to handle enchantments like Auto-Smelt or Explosive Touch.
     }
-    
+
     /**
      * Handles bow shooting to trigger SHOOT_BOW effects.
      * This is a placeholder for future expansion.
@@ -62,13 +62,13 @@ public final class GlobalListener implements Listener {
         if (!(event.getEntity() instanceof Player)) {
             return;
         }
-        
+
         ItemStack bow = event.getBow();
         if (bow == null || bow.getType().isAir()) {
             return;
         }
 
-        // TODO: Create and call EffectProcessor.processShootEvent(event)
+        // TODO: Create and call a new 'EffectProcessor.processShootEvent(event)'
         // to handle enchantments that modify the arrow before it's fired.
     }
 }
