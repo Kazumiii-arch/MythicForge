@@ -9,22 +9,29 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
+/**
+ * Manages the creation of all custom "tome-like" items, such as
+ * Enchantment Scrolls, Dusts, Orbs, and Runes based on definitions in the config.
+ *
+ * @author Vortex
+ * @version 1.0.1
+ */
 public final class TomeManager {
 
     private final MythicForge plugin;
+    // NBT Keys to identify our items and their properties
     private final NamespacedKey itemTypeKey;
     private final NamespacedKey scrollEnchantKey;
     private final NamespacedKey scrollLevelKey;
     private final NamespacedKey runeIdKey;
-
 
     public TomeManager(MythicForge plugin) {
         this.plugin = plugin;
@@ -34,10 +41,21 @@ public final class TomeManager {
         this.runeIdKey = new NamespacedKey(plugin, "mythic_rune_id");
     }
 
+    /**
+     * Creates an Enchantment Scroll ItemStack for a specific enchantment.
+     *
+     * @param enchant The enchantment for the scroll. Must not be null.
+     * @param level   The level of the enchantment.
+     * @param amount  The number of scrolls to create.
+     * @return The resulting ItemStack.
+     */
     public ItemStack createScroll(CustomEnchant enchant, int level, int amount) {
         Objects.requireNonNull(enchant, "Cannot create a scroll for a null enchantment.");
         ConfigurationSection itemConfig = plugin.getConfig().getConfigurationSection("mechanics.custom_items.enchant_scroll");
-        if (itemConfig == null) return new ItemStack(Material.AIR);
+        if (itemConfig == null) {
+            plugin.getLogger().severe("Missing config section for 'enchant_scroll'!");
+            return new ItemStack(Material.AIR);
+        }
 
         Material material = Material.matchMaterial(itemConfig.getString("material", "BOOK").toUpperCase());
         if (material == null) material = Material.BOOK;
@@ -74,18 +92,27 @@ public final class TomeManager {
         return scrollItem;
     }
 
+    /**
+     * Creates a custom item defined in the 'mechanics.custom_items' section of the config.
+     * This is the main factory method for most non-scroll items.
+     *
+     * @param itemId The key of the item (e.g., 'mythic_dust', 'protection_orb').
+     * @param amount The amount of the item to create.
+     * @return The resulting ItemStack, or an AIR item if the definition is not found.
+     */
     public ItemStack createCustomItem(String itemId, int amount) {
         String configPath = "mechanics.custom_items." + itemId;
         ConfigurationSection itemConfig = plugin.getConfig().getConfigurationSection(configPath);
+
         if (itemConfig == null) {
-            plugin.getLogger().warning("Attempted to create custom item '" + itemId + "' but its definition was not found.");
+            plugin.getLogger().warning("Attempted to create custom item '" + itemId + "' but its definition was not found in config.yml.");
             return new ItemStack(Material.AIR);
         }
 
         String materialName = itemConfig.getString("material", "STONE").toUpperCase();
         Material material = Material.matchMaterial(materialName);
         if (material == null) {
-            plugin.getLogger().severe("Invalid material '" + materialName + "' for custom item '" + itemId + "'.");
+            plugin.getLogger().severe("Invalid material '" + materialName + "' for custom item '" + itemId + "' in config.yml!");
             return new ItemStack(Material.AIR);
         }
 
@@ -95,14 +122,20 @@ public final class TomeManager {
 
         String displayName = itemConfig.getString("display_name", itemId);
         meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName));
+
         List<String> lore = itemConfig.getStringList("lore").stream()
                 .map(line -> ChatColor.translateAlternateColorCodes('&', line))
                 .collect(Collectors.toList());
         meta.setLore(lore);
 
         meta.getPersistentDataContainer().set(itemTypeKey, PersistentDataType.STRING, itemId);
+
         customItem.setItemMeta(meta);
         return customItem;
+    }
+
+    public ItemStack createMythicDust(int amount) {
+        return createCustomItem("mythic_dust", amount);
     }
     
     public ItemStack createRuneItem(Rune rune, int amount) {
@@ -134,4 +167,4 @@ public final class TomeManager {
         }
         return roman.toString();
     }
-                            }
+            }
