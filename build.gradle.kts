@@ -4,10 +4,9 @@
 // Project: MythicForge (Definitive Final Version)
 // ========================================================================
 
-// Using the java-library and maven-publish plugins for a professional setup
+// Using the modern java-library and shadow plugins
 plugins {
     id("java-library")
-    id("maven-publish")
     id("com.gradleup.shadow") version "8.3.6"
 }
 
@@ -38,7 +37,8 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // CORRECTED: This now correctly declares FancyNpcs and its required library, FancyLib.
+    // --- DEFINITIVE FANCYNPC FIX ---
+    // This correctly declares FancyNpcs AND its required internal library, FancyLib.
     // This will resolve all the "cannot find symbol" errors related to the NPC system.
     compileOnly("de.oliver:FancyNpcs:2.6.0")
     compileOnly("de.oliver:FancyLib:37")
@@ -50,10 +50,6 @@ tasks {
         archiveClassifier.set("")
         archiveBaseName.set("MythicForge")
         archiveVersion.set(project.version.toString())
-        
-        // This is not strictly necessary unless we add a library that needs relocation,
-        // but it's good practice to have the configuration ready.
-        // relocate("package.to.relocate", "com.vortex.mythicforge.libs.relocatedpackage")
     }
 
     // This ensures that running 'build' will also create our final JAR.
