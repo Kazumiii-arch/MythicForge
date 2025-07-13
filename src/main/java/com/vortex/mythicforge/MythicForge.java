@@ -4,7 +4,7 @@ import com.vortex.mythicforge.commands.MythicForgeCommand;
 import com.vortex.mythicforge.gui.RotatingShopGui;
 import com.vortex.mythicforge.gui.SalvageGUI;
 import com.vortex.mythicforge.gui.SetShopGui;
-import com.vortex.mythicforge.hooks.CitizensHook;
+import com.vortex.mythicforge.hooks.FancyNpcHook; // UPDATED
 import com.vortex.mythicforge.hooks.MythicForgeExpansion;
 import com.vortex.mythicforge.hooks.VaultHook;
 import com.vortex.mythicforge.listeners.GlobalListener;
@@ -38,7 +38,7 @@ public final class MythicForge extends JavaPlugin {
     
     // API Hooks
     private VaultHook vaultHook;
-    private CitizensHook citizensHook;
+    private FancyNpcHook fancyNpcHook; // UPDATED
 
     @Override
     public void onEnable() {
@@ -49,21 +49,17 @@ public final class MythicForge extends JavaPlugin {
         // The managers will handle their own specific configs (runes.yml, etc.)
         
         // --- 2. Initialize All Managers ---
-        // These managers read data from files, so they should be loaded first.
         this.enchantmentManager = new EnchantmentManager(this);
         this.runeManager = new RuneManager(this);
         this.setBonusManager = new SetBonusManager(this);
-        
-        // These managers often depend on the data managers being ready.
         this.itemManager = new ItemManager(this);
         this.tomeManager = new TomeManager(this);
         this.setShopManager = new SetShopManager(this);
         this.shopManager = new ShopManager(this);
         
         // --- 3. Initialize API Hooks ---
-        // These should be loaded after our core systems are ready.
         this.vaultHook = new VaultHook(this);
-        this.citizensHook = new CitizensHook(this);
+        this.fancyNpcHook = new FancyNpcHook(this); // UPDATED
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new MythicForgeExpansion(this).register();
         }
@@ -73,10 +69,10 @@ public final class MythicForge extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new InventoryListener(this), this);
         getServer().getPluginManager().registerEvents(new TomeListener(this), this);
         getServer().getPluginManager().registerEvents(new NpcListener(), this);
-        // GUIs that implement Listener must also be registered.
-        getServer().getPluginManager().registerEvents(new SalvageGUI(null), this); // Dummy instance for registration
-        getServer().getPluginManager().registerEvents(new RotatingShopGui(null), this);
-        getServer().getPluginManager().registerEvents(new SetShopGui(null), this);
+        // Registering GUI listeners (a dummy instance is fine for registration purposes)
+        new SalvageGUI(null); 
+        new RotatingShopGui(null);
+        new SetShopGui(null);
 
         // --- 5. Register Commands ---
         MythicForgeCommand commandExecutor = new MythicForgeCommand();
@@ -84,8 +80,7 @@ public final class MythicForge extends JavaPlugin {
         getCommand("mythicforge").setTabCompleter(commandExecutor);
         
         // --- 6. Schedule Repeating Tasks ---
-        // This should start last, after everything else is fully loaded.
-        new ActiveEffectTask(this).runTaskTimer(this, 100L, 20L); // Start after 5s, repeat every 1s
+        new ActiveEffectTask(this).runTaskTimer(this, 100L, 20L);
 
         getLogger().info("MythicForge v" + getDescription().getVersion() + " by Vortex has been fully enabled.");
     }
@@ -107,5 +102,12 @@ public final class MythicForge extends JavaPlugin {
     public ShopManager getShopManager() { return shopManager; }
     public SetShopManager getSetShopManager() { return setShopManager; }
     public VaultHook getVaultHook() { return vaultHook; }
-    public CitizensHook getCitizensHook() { return citizensHook; }
+    
+    /**
+     * Gets the handler for FancyNpcs API interactions.
+     * @return The FancyNpcHook instance.
+     */
+    public FancyNpcHook getFancyNpcHook() { // UPDATED
+        return fancyNpcHook;
+    }
 }
