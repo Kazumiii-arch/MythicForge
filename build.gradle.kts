@@ -1,3 +1,8 @@
+// ========================================================================
+// File: build.gradle.kts
+// Location: /build.gradle.kts
+// Project: MythicForge (Adapted for FancyNPC)
+// ========================================================================
 plugins {
     java
     id("com.github.johnrengelman.shadow") version "8.1.1"
@@ -8,15 +13,9 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
-
-    // Spigot API
     maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
-
-    // PlaceholderAPI repo
+    maven { url = uri("https://jitpack.io/") } // For Vault and FancyNPCs
     maven { url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/") }
-
-    // JitPack (for Vault or others)
-    maven { url = uri("https://jitpack.io/") }
 }
 
 dependencies {
@@ -24,8 +23,9 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // ✅ Use FancyNPCs from local JAR
-    implementation(files("libs/FancyNPCs.jar"))
+    // REMOVED: Citizens dependency
+    // ADDED: FancyNpcs dependency, which is found on Jitpack
+    compileOnly("de.oliver:FancyNpcs:2.5.0")
 }
 
 java {
@@ -37,15 +37,12 @@ tasks {
         archiveBaseName.set("MythicForge")
         archiveClassifier.set("")
         archiveVersion.set(project.version.toString())
-
-        // ✅ Relocate FancyNPCs to avoid conflicts
-        relocate("de.oliver.fancynpcs", "com.vortex.libs.fancynpcs")
     }
 
     build {
         dependsOn(shadowJar)
     }
-
+    
     withType<JavaCompile> {
         options.encoding = "UTF-8"
     }
