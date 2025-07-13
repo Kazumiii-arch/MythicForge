@@ -1,7 +1,7 @@
 // ========================================================================
 // File: build.gradle.kts
 // Location: /build.gradle.kts
-// Project: MythicForge (Corrected Dependency)
+// Project: MythicForge (Using Correct Local JAR Version)
 // ========================================================================
 plugins {
     java
@@ -12,9 +12,15 @@ group = "com.vortex"
 version = "1.0.0"
 
 repositories {
+    // This tells Gradle to look in the 'libs' folder for JAR files.
+    flatDir {
+        dirs("libs")
+    }
+    
+    // We still need these for Spigot, Vault, and PlaceholderAPI
     mavenCentral()
     maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
-    maven { url = uri("https://jitpack.io/") } // For Vault and FancyNpcs
+    maven { url = uri("https://jitpack.io/") }
     maven { url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/") }
 }
 
@@ -23,9 +29,8 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // CORRECTED: This is the proper JitPack format for FancyNpcs.
-    // The format is 'com.github.GitHubUser:RepositoryName:VersionTag'
-    compileOnly("com.github.Oliver-N:FancyNpcs:v2.5.0")
+    // UPDATED: This now points to the exact JAR file you have in your 'libs' folder.
+    compileOnly(files("libs/FancyNpcs-2.6.0.280.jar"))
 }
 
 java {
