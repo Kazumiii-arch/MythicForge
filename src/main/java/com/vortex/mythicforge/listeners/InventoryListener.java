@@ -18,6 +18,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.ChatColor;
 
+import java.util.ArrayList;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
