@@ -24,7 +24,7 @@ import java.util.UUID;
  * processing role assignments for administrators.
  *
  * @author Vortex
- * @version 1.0.1
+ * @version 1.0.2
  */
 public final class NpcListener implements Listener {
 
@@ -45,8 +45,7 @@ public final class NpcListener implements Listener {
 
     /**
      * Handles right-clicks on any entity to check if it's a MythicForge NPC.
-     * This method contains two main logical paths: one for admins setting roles,
-     * and one for players opening GUIs.
+     * Contains two logical paths: one for admins setting roles, and one for players opening GUIs.
      *
      * @param event The entity interaction event.
      */
@@ -74,7 +73,7 @@ public final class NpcListener implements Listener {
             String roleToSet = roleSetters.remove(player.getUniqueId());
 
             plugin.getFancyNpcHook().setNpcRole(npc, roleToSet);
-            player.sendMessage(ChatColor.GREEN + "Successfully set NPC '" + npc.getData().getName() + "' role to: " + roleToSet);
+            player.sendMessage(ChatColor.GREEN + "Successfully set NPC '" + npc.getData().getName() + "'s role to: " + roleToSet);
             return; // Stop further processing after assigning the role.
         }
 
@@ -83,7 +82,7 @@ public final class NpcListener implements Listener {
         Optional<String> roleOptional = plugin.getFancyNpcHook().getNpcRole(event.getRightClicked());
 
         if (roleOptional.isPresent()) {
-            // Prevent any default NPC behavior (like text popups).
+            // Prevent any default NPC behavior.
             event.setCancelled(true);
             String role = roleOptional.get();
 
